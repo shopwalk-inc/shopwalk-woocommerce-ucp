@@ -57,8 +57,17 @@ class Shopwalk_UCP_Settings {
                 'desc' => __('Configure the Universal Commerce Protocol (UCP) integration. This allows AI shopping agents like Shopwalk to discover, browse, and purchase from your store.', 'shopwalk-ucp'),
                 'id'   => 'shopwalk_ucp_section_title',
             ],
+            'shopwalk_api_key' => [
+                'name'     => __('Shopwalk API Key', 'shopwalk-ucp'),
+                'type'     => 'password',
+                'desc'     => __('Your Shopwalk API key for syncing products. Get one at shopwalk.com → Profile → API Keys.', 'shopwalk-ucp'),
+                'id'       => 'shopwalk_ucp_shopwalk_api_key',
+                'default'  => '',
+                'desc_tip' => true,
+                'placeholder' => 'sk_live_...',
+            ],
             'api_key' => [
-                'name'     => __('API Key', 'shopwalk-ucp'),
+                'name'     => __('Inbound API Key', 'shopwalk-ucp'),
                 'type'     => 'text',
                 'desc'     => __('Set an API key to secure UCP checkout and order endpoints. Leave blank to allow open access (not recommended for production).', 'shopwalk-ucp'),
                 'id'       => 'shopwalk_ucp_api_key',

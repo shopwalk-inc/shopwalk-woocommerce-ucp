@@ -58,6 +58,7 @@ function shopwalk_ucp_init() {
     require_once SHOPWALK_UCP_PLUGIN_DIR . 'includes/class-shopwalk-ucp-webhooks.php';
     require_once SHOPWALK_UCP_PLUGIN_DIR . 'includes/class-shopwalk-ucp-settings.php';
     require_once SHOPWALK_UCP_PLUGIN_DIR . 'includes/class-shopwalk-ucp-auth.php';
+    require_once SHOPWALK_UCP_PLUGIN_DIR . 'includes/class-shopwalk-ucp-sync.php';
 
     // Boot
     Shopwalk_UCP::instance();
