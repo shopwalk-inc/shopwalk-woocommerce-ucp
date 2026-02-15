@@ -22,6 +22,20 @@ class Shopwalk_UCP {
         $this->init_hooks();
     }
 
+    /**
+     * Cloning is forbidden.
+     */
+    public function __clone() {
+        wc_doing_it_wrong(__FUNCTION__, 'Cloning is forbidden.', '1.0.0');
+    }
+
+    /**
+     * Unserializing is forbidden.
+     */
+    public function __wakeup() {
+        wc_doing_it_wrong(__FUNCTION__, 'Unserializing is forbidden.', '1.0.0');
+    }
+
     private function init_hooks(): void {
         // Register REST API routes
         add_action('rest_api_init', [$this, 'register_routes']);

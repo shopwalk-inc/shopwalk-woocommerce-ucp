@@ -6,6 +6,9 @@
  * Version:     1.0.0
  * Author:      Shopwalk, Inc.
  * Author URI:  https://shopwalk.com
+ * Developer:   Shopwalk, Inc.
+ * Developer URI: https://shopwalk.com
+ * Requires Plugins: woocommerce
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: shopwalk-ucp
