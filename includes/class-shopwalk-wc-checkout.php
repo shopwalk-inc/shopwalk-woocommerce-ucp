@@ -74,9 +74,20 @@ class Shopwalk_WC_Checkout {
         $messages = [];
         foreach ($line_items as $li) {
             $product_id = $li['item']['id'] ?? null;
+            $variant_id = $li['item']['variant_id'] ?? null;
             $quantity   = $li['quantity'] ?? 1;
 
-            $product = wc_get_product($product_id);
+            // If variant_id provided, use variation product
+            if ($variant_id) {
+                $product = wc_get_product($variant_id);
+                // Verify this variation belongs to the parent product
+                if ($product && $product->get_parent_id() != $product_id) {
+                    $product = null; // Mismatch — reject
+                }
+            } else {
+                $product = wc_get_product($product_id);
+            }
+
             if (!$product) {
                 $messages[] = [
                     'type'     => 'error',
@@ -221,10 +232,32 @@ class Shopwalk_WC_Checkout {
             ], 422);
         }
 
-        // Process payment (placeholder — real payment processing depends on gateway)
+        // Process payment
         $body = $request->get_json_params();
         if (isset($body['payment_mandate'])) {
             $order->update_meta_data('_shopwalk_payment_mandate', wp_json_encode($body['payment_mandate']));
+        }
+
+        $payment_mandate = $body['payment_mandate'] ?? [];
+        $handler_id      = $payment_mandate['handler_id'] ?? '';
+        $payment_token   = $payment_mandate['token'] ?? '';
+
+        if ($handler_id === 'stripe' && !empty($payment_token) && class_exists('WC_Stripe_Helper')) {
+            // Process via Stripe gateway
+            $result = $this->charge_stripe($order, $payment_token);
+            if (is_wp_error($result)) {
+                return new WP_REST_Response([
+                    'error' => 'Payment failed: ' . $result->get_error_message(),
+                    'code'  => 'PAYMENT_FAILED',
+                ], 402);
+            }
+        } elseif ($handler_id === 'cod' || empty($handler_id)) {
+            // Cash on delivery or no payment — accept as-is
+            $order->set_payment_method('cod');
+            $order->set_payment_method_title('Pay on Delivery');
+        } else {
+            // Unknown handler — still accept but flag it
+            $order->set_payment_method($handler_id);
         }
 
         // Mark as processing
@@ -412,9 +445,10 @@ class Shopwalk_WC_Checkout {
             $items[] = [
                 'id'       => (string) $item_id,
                 'item'     => [
-                    'id'    => (string) ($product ? $product->get_id() : 0),
-                    'title' => $item->get_name(),
-                    'price' => (int) round($item->get_subtotal() / max($item->get_quantity(), 1) * 100),
+                    'id'         => (string) ($product ? $product->get_parent_id() ?: $product->get_id() : 0),
+                    'variant_id' => ($product && $product->get_type() === 'variation') ? (string) $product->get_id() : null,
+                    'title'      => $item->get_name(),
+                    'price'      => (int) round($item->get_subtotal() / max($item->get_quantity(), 1) * 100),
                 ],
                 'quantity' => $item->get_quantity(),
                 'totals'   => [
@@ -434,5 +468,58 @@ class Shopwalk_WC_Checkout {
             ['type' => 'discount', 'amount' => (int) round((float) $order->get_discount_total() * 100)],
             ['type' => 'total',    'amount' => (int) round((float) $order->get_total() * 100)],
         ];
+    }
+
+    /**
+     * Charge a Stripe payment method against the order total.
+     *
+     * @param WC_Order $order
+     * @param string   $payment_method_id  Stripe PaymentMethod ID (pm_xxx)
+     * @return true|WP_Error
+     */
+    private function charge_stripe(WC_Order $order, string $payment_method_id): true|WP_Error {
+        // Use Stripe PHP SDK if WooCommerce Stripe plugin is active
+        if (!class_exists('WC_Stripe_API')) {
+            // Fallback: just set payment method and proceed (gateway will handle on order creation)
+            $order->set_payment_method('stripe');
+            $order->update_meta_data('_stripe_source_id', $payment_method_id);
+            $order->update_meta_data('_payment_method_id', $payment_method_id);
+            return true;
+        }
+
+        try {
+            $amount   = (int) round($order->get_total() * 100); // cents
+            $currency = strtolower($order->get_currency());
+
+            $intent = WC_Stripe_API::request([
+                'amount'              => $amount,
+                'currency'            => $currency,
+                'payment_method'      => $payment_method_id,
+                'confirmation_method' => 'automatic',
+                'confirm'             => 'true',
+                'description'        => 'Shopwalk order #' . $order->get_id(),
+            ], 'payment_intents');
+
+            if (!empty($intent->error)) {
+                return new WP_Error('stripe_error', $intent->error->message ?? 'Stripe error');
+            }
+
+            if ($intent->status === 'succeeded') {
+                $order->set_payment_method('stripe');
+                $order->set_payment_method_title('Stripe (Shopwalk)');
+                $order->update_meta_data('_stripe_intent_id', $intent->id);
+                $order->add_order_note('Payment processed via Shopwalk — Stripe PaymentIntent: ' . $intent->id);
+                return true;
+            }
+
+            if ($intent->status === 'requires_action') {
+                return new WP_Error('stripe_requires_action', '3D Secure authentication required. Complete payment on merchant site.');
+            }
+
+            return new WP_Error('stripe_failed', 'Payment intent status: ' . $intent->status);
+
+        } catch (Exception $e) {
+            return new WP_Error('stripe_exception', $e->getMessage());
+        }
     }
 }

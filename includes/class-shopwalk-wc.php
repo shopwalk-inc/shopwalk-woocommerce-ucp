@@ -49,6 +49,14 @@ class Shopwalk_WC {
         if (is_admin()) {
             Shopwalk_WC_Settings::instance();
         }
+
+        // Add version header to all Shopwalk REST responses
+        add_filter('rest_post_dispatch', function($result, $server, $request) {
+            if (strpos($request->get_route(), '/shopwalk-wc/') !== false) {
+                $result->header('X-Shopwalk-WC-Version', SHOPWALK_WC_VERSION);
+            }
+            return $result;
+        }, 10, 3);
     }
 
     /**

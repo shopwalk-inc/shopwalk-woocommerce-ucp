@@ -93,6 +93,10 @@ class Shopwalk_WC_Webhooks {
             return;
         }
 
+        // 1. Fire outbound webhook to Shopwalk platform
+        $this->fire_shopwalk_platform_webhook($order, $new_status);
+
+        // 2. Fire any merchant-registered webhooks
         $webhooks = get_option('shopwalk_wc_webhooks', []);
         if (empty($webhooks)) {
             return;
@@ -123,6 +127,41 @@ class Shopwalk_WC_Webhooks {
 
             $this->send_webhook($webhook, $payload);
         }
+    }
+
+    /**
+     * Fire an outbound webhook to the Shopwalk platform endpoint.
+     */
+    private function fire_shopwalk_platform_webhook(WC_Order $order, string $new_status): void {
+        $payload = [
+            'event'     => 'order.' . $new_status,
+            'order_id'  => $order->get_meta('_shopwalk_session_id'), // sw_23
+            'merchant'  => wp_parse_url(home_url(), PHP_URL_HOST),
+            'data'      => [
+                'wc_order_id'     => $order->get_id(),
+                'status'          => $new_status,
+                'total'           => $order->get_total(),
+                'currency'        => $order->get_currency(),
+                'tracking_number' => $order->get_meta('_tracking_number') ?: '',
+                'tracking_url'    => $order->get_meta('_tracking_url') ?: '',
+            ],
+            'timestamp' => time(),
+        ];
+
+        $api_key = get_option('shopwalk_wc_shopwalk_api_key', '');
+        $body    = wp_json_encode($payload);
+        $hmac    = hash_hmac('sha256', $body, $api_key);
+
+        wp_remote_post('https://api.shopwalk.com/api/v1/webhooks/woocommerce', [
+            'method'  => 'POST',
+            'timeout' => 10,
+            'headers' => [
+                'Content-Type'           => 'application/json',
+                'X-Shopwalk-Hmac-Sha256' => $hmac,
+                'X-Shopwalk-Merchant'    => wp_parse_url(home_url(), PHP_URL_HOST),
+            ],
+            'body' => $body,
+        ]);
     }
 
     private function send_webhook(array $webhook, array $payload): void {

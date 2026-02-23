@@ -19,8 +19,7 @@ class Shopwalk_WC_Profile {
         $logo        = has_custom_logo() ? wp_get_attachment_image_url(get_theme_mod('custom_logo'), 'full') : null;
         $rest_url    = rest_url('shopwalk-wc/v1');
 
-        $settings = get_option('shopwalk_wc_settings', []);
-        $payment_handlers = self::get_payment_handlers($settings);
+        $payment_handlers = self::get_payment_handlers();
 
         $profile = [
             'name'        => $site_name,
@@ -40,48 +39,20 @@ class Shopwalk_WC_Profile {
     /**
      * Detect available payment handlers from active WC payment gateways.
      */
-    private static function get_payment_handlers(array $settings): array {
-        $handlers = [];
-
+    private static function get_payment_handlers(): array {
         if (!function_exists('WC')) {
-            return $handlers;
+            return [];
         }
 
+        $handlers = [];
         $gateways = WC()->payment_gateways()->get_available_payment_gateways();
 
         foreach ($gateways as $id => $gateway) {
-            $handler_id = self::map_gateway($id);
-            if ($handler_id) {
-                $handlers[$handler_id] = [
-                    [
-                        'id'      => $handler_id,
-                        'version' => SHOPWALK_WC_VERSION,
-                    ],
-                ];
+            if ($gateway->enabled === 'yes') {
+                $handlers[] = $id; // e.g. "stripe", "paypal", "cod", "bacs"
             }
         }
 
         return $handlers;
-    }
-
-    /**
-     * Map WooCommerce gateway IDs to handler identifiers.
-     */
-    private static function map_gateway(string $gateway_id): ?string {
-        $map = [
-            'stripe'                      => 'com.stripe',
-            'stripe_cc'                   => 'com.stripe',
-            'ppcp-gateway'                => 'com.paypal',
-            'paypal'                      => 'com.paypal',
-            'ppcp-credit-card-gateway'    => 'com.paypal',
-            'apple_pay'                   => 'com.apple.pay',
-            'google_pay'                  => 'com.google.pay',
-            'square_credit_card'          => 'com.squareup',
-            'cod'                         => null,
-            'bacs'                        => null,
-            'cheque'                      => null,
-        ];
-
-        return $map[$gateway_id] ?? null;
     }
 }
