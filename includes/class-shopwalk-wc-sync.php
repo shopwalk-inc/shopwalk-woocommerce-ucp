@@ -89,8 +89,25 @@ class Shopwalk_WC_Sync {
      * Notify Shopwalk when a product is deleted.
      */
     public function delete_product(int $product_id): void {
-        // Future: call a delete endpoint on Shopwalk
-        // For now, products will just stop syncing
+        $api_key = $this->get_api_key();
+        if (empty($api_key)) {
+            return;
+        }
+
+        $merchant_id = wp_parse_url(home_url(), PHP_URL_HOST);
+        $url = rtrim(get_option('shopwalk_wc_shopwalk_api_url', 'https://api.shopwalk.com'), '/')
+            . '/api/v1/products/ingest'
+            . '?external_id=' . urlencode((string) $product_id)
+            . '&provider=woocommerce'
+            . '&merchant_id=' . urlencode($merchant_id);
+
+        wp_remote_request($url, [
+            'method'  => 'DELETE',
+            'timeout' => 10,
+            'headers' => [
+                'X-API-Key' => $api_key,
+            ],
+        ]);
     }
 
     /**

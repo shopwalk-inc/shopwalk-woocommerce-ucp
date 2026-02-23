@@ -22,6 +22,12 @@ class Shopwalk_WC_Settings {
         add_filter('woocommerce_settings_tabs_array', [$this, 'add_settings_tab'], 50);
         add_action('woocommerce_settings_tabs_shopwalk', [$this, 'settings_tab']);
         add_action('woocommerce_update_options_shopwalk', [$this, 'update_settings']);
+
+        // Sync All — AJAX handler (logged-in admin)
+        add_action('wp_ajax_shopwalk_wc_sync_all', [$this, 'ajax_sync_all']);
+
+        // Enqueue admin JS on our settings tab
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
     }
 
     public function add_settings_tab(array $tabs): array {
@@ -49,6 +55,93 @@ class Shopwalk_WC_Settings {
 
         // Flush rewrite rules when settings change
         flush_rewrite_rules();
+    }
+
+    /**
+     * AJAX: sync all published products to Shopwalk.
+     * Returns JSON {synced, failed, total}.
+     */
+    public function ajax_sync_all(): void {
+        check_ajax_referer('shopwalk_wc_sync_all', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions.'], 403);
+        }
+
+        $api_key = get_option('shopwalk_wc_shopwalk_api_key', '');
+        if (empty($api_key)) {
+            wp_send_json_error(['message' => 'No Shopwalk API key configured.'], 400);
+        }
+
+        $product_ids = wc_get_products([
+            'status' => 'publish',
+            'limit'  => -1,
+            'return' => 'ids',
+        ]);
+
+        $total  = count($product_ids);
+        $synced = 0;
+        $failed = 0;
+        $sync   = Shopwalk_WC_Sync::instance();
+
+        foreach ($product_ids as $id) {
+            try {
+                $sync->sync_product($id);
+                $synced++;
+            } catch (\Exception $e) {
+                $failed++;
+            }
+        }
+
+        $status = get_option('shopwalk_wc_sync_status', '');
+        if ($status !== 'OK') {
+            wp_send_json_error([
+                'message' => 'Sync completed but API returned an error: ' . $status,
+                'total'   => $total,
+                'synced'  => $synced,
+                'failed'  => $failed,
+            ]);
+        }
+
+        wp_send_json_success([
+            'message' => sprintf('%d of %d products synced successfully.', $synced, $total),
+            'total'   => $total,
+            'synced'  => $synced,
+            'failed'  => $failed,
+            'last'    => get_option('shopwalk_wc_last_sync', ''),
+        ]);
+    }
+
+    /**
+     * Enqueue admin JS only on the Shopwalk settings tab.
+     */
+    public function enqueue_admin_scripts(string $hook): void {
+        if ($hook !== 'woocommerce_page_wc-settings') {
+            return;
+        }
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if (($GLOBALS['current_tab'] ?? '') !== 'shopwalk' && (isset($_GET['tab']) && $_GET['tab'] !== 'shopwalk')) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'shopwalk-wc-admin',
+            SHOPWALK_WC_PLUGIN_URL . 'assets/admin.js',
+            ['jquery'],
+            SHOPWALK_WC_VERSION,
+            true
+        );
+
+        wp_localize_script('shopwalk-wc-admin', 'shopwalkWC', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('shopwalk_wc_sync_all'),
+            'i18n'    => [
+                'syncing'  => __('Syncing...', 'shopwalk-for-woocommerce'),
+                'syncNow'  => __('Sync All Products Now', 'shopwalk-for-woocommerce'),
+                'success'  => __('Sync complete!', 'shopwalk-for-woocommerce'),
+                'error'    => __('Sync failed. Check your API key.', 'shopwalk-for-woocommerce'),
+            ],
+        ]);
     }
 
     private function get_settings(): array {
@@ -111,7 +204,7 @@ class Shopwalk_WC_Settings {
                 'id'   => 'shopwalk_wc_section_end',
             ],
             'status_title' => [
-                'name' => __('Sync Status', 'shopwalk-for-woocommerce'),
+                'name' => __('Product Sync', 'shopwalk-for-woocommerce'),
                 'type' => 'title',
                 'desc' => $this->get_sync_status_html(),
                 'id'   => 'shopwalk_wc_status_title',
@@ -124,7 +217,7 @@ class Shopwalk_WC_Settings {
     }
 
     /**
-     * Build a simple sync status display for the settings page.
+     * Build sync status + Sync Now button for the settings page.
      */
     private function get_sync_status_html(): string {
         $last_sync   = get_option('shopwalk_wc_last_sync', '');
@@ -137,14 +230,22 @@ class Shopwalk_WC_Settings {
 
         $status_html = '';
         if ($last_sync) {
-            $status_html .= '<strong>' . esc_html__('Last sync:', 'shopwalk-for-woocommerce') . '</strong> ' . esc_html($last_sync);
+            $color        = ($sync_status === 'OK') ? '#46b450' : '#dc3232';
+            $status_label = ($sync_status === 'OK') ? '✓ OK' : esc_html($sync_status);
+            $status_html .= '<p><strong>' . esc_html__('Last sync:', 'shopwalk-for-woocommerce') . '</strong> '
+                . esc_html($last_sync)
+                . ' &mdash; <span style="color:' . $color . ';">' . $status_label . '</span></p>';
+        } else {
+            $status_html .= '<p style="color:#999;">' . esc_html__('Products sync automatically when saved. No manual sync recorded yet.', 'shopwalk-for-woocommerce') . '</p>';
         }
-        if ($sync_status) {
-            $status_html .= ' &mdash; ' . esc_html($sync_status);
-        }
-        if (!$status_html) {
-            $status_html = esc_html__('No sync recorded yet. Products will sync automatically when saved.', 'shopwalk-for-woocommerce');
-        }
+
+        // Sync Now button + result area
+        $status_html .= '<p>'
+            . '<button type="button" id="shopwalk-sync-now" class="button button-secondary">'
+            . esc_html__('Sync All Products Now', 'shopwalk-for-woocommerce')
+            . '</button>'
+            . ' <span id="shopwalk-sync-result" style="margin-left:10px;"></span>'
+            . '</p>';
 
         return $status_html;
     }
