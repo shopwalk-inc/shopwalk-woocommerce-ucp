@@ -2,15 +2,14 @@
 /**
  * Product Sync — pushes product changes to Shopwalk API.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP_Sync {
+class Shopwalk_WC_Sync {
 
     private static ?self $instance = null;
-    private string $api_url = 'https://api.shopwalk.com/api/v1/products/ingest';
 
     public static function instance(): self {
         if (null === self::$instance) {
@@ -33,7 +32,15 @@ class Shopwalk_UCP_Sync {
      * Get the Shopwalk API key from settings.
      */
     private function get_api_key(): string {
-        return get_option('shopwalk_ucp_shopwalk_api_key', '');
+        return get_option('shopwalk_wc_shopwalk_api_key', '');
+    }
+
+    /**
+     * Get the Shopwalk API base URL from settings.
+     */
+    private function get_api_url(): string {
+        $base = get_option('shopwalk_wc_shopwalk_api_url', 'https://api.shopwalk.com');
+        return rtrim($base, '/') . '/api/v1/products/ingest';
     }
 
     /**
@@ -59,7 +66,7 @@ class Shopwalk_UCP_Sync {
 
         $payload = $this->build_product_payload($product);
 
-        wp_remote_post($this->api_url, [
+        $response = wp_remote_post($this->get_api_url(), [
             'timeout' => 15,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -67,6 +74,15 @@ class Shopwalk_UCP_Sync {
             ],
             'body' => wp_json_encode($payload),
         ]);
+
+        // Record sync status
+        $timestamp = current_time('Y-m-d H:i:s');
+        update_option('shopwalk_wc_last_sync', $timestamp);
+        if (is_wp_error($response)) {
+            update_option('shopwalk_wc_sync_status', 'Error: ' . $response->get_error_message());
+        } else {
+            update_option('shopwalk_wc_sync_status', 'OK');
+        }
     }
 
     /**
@@ -124,22 +140,22 @@ class Shopwalk_UCP_Sync {
         }
 
         return [
-            'external_id'      => (string) $product->get_id(),
-            'provider'         => 'woocommerce',
-            'merchant_id'      => wp_parse_url(home_url(), PHP_URL_HOST),
-            'name'             => $product->get_name(),
-            'description'      => $product->get_description(),
+            'external_id'       => (string) $product->get_id(),
+            'provider'          => 'woocommerce',
+            'merchant_id'       => wp_parse_url(home_url(), PHP_URL_HOST),
+            'name'              => $product->get_name(),
+            'description'       => $product->get_description(),
             'short_description' => $product->get_short_description(),
-            'category'         => !empty($categories) ? $categories[0] : '',
-            'base_price'       => (float) $product->get_price(),
-            'compare_at_price' => $product->get_regular_price() !== $product->get_sale_price()
+            'category'          => !empty($categories) ? $categories[0] : '',
+            'base_price'        => (float) $product->get_price(),
+            'compare_at_price'  => $product->get_regular_price() !== $product->get_sale_price()
                 ? (float) $product->get_regular_price()
                 : null,
-            'currency'         => get_woocommerce_currency(),
-            'in_stock'         => $product->is_in_stock(),
-            'stock_quantity'   => $product->get_stock_quantity() ?? 0,
-            'source_url'       => get_permalink($product->get_id()),
-            'images'           => $images,
+            'currency'          => get_woocommerce_currency(),
+            'in_stock'          => $product->is_in_stock(),
+            'stock_quantity'    => $product->get_stock_quantity() ?? 0,
+            'source_url'        => get_permalink($product->get_id()),
+            'images'            => $images,
         ];
     }
 }
@@ -147,6 +163,6 @@ class Shopwalk_UCP_Sync {
 // Boot the sync
 add_action('plugins_loaded', function () {
     if (class_exists('WooCommerce')) {
-        Shopwalk_UCP_Sync::instance();
+        Shopwalk_WC_Sync::instance();
     }
 }, 20);

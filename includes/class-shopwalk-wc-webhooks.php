@@ -1,16 +1,16 @@
 <?php
 /**
- * UCP Webhooks — notifies platforms about order status changes.
+ * Webhooks — notifies Shopwalk about order status changes.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP_Webhooks {
+class Shopwalk_WC_Webhooks {
 
     public function __construct() {
-        // Hook into WC order status changes to send UCP webhooks
+        // Hook into WC order status changes to send webhooks
         add_action('woocommerce_order_status_changed', [$this, 'on_order_status_changed'], 10, 4);
     }
 
@@ -19,19 +19,19 @@ class Shopwalk_UCP_Webhooks {
         register_rest_route($namespace, '/webhooks', [
             'methods'             => 'POST',
             'callback'            => [$this, 'register_webhook'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         register_rest_route($namespace, '/webhooks', [
             'methods'             => 'GET',
             'callback'            => [$this, 'list_webhooks'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         register_rest_route($namespace, '/webhooks/(?P<id>\d+)', [
             'methods'             => 'DELETE',
             'callback'            => [$this, 'delete_webhook'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
     }
 
@@ -48,7 +48,7 @@ class Shopwalk_UCP_Webhooks {
 
         $events = $body['events'] ?? ['order.status_changed', 'order.fulfilled', 'order.refunded'];
 
-        $webhooks = get_option('shopwalk_ucp_webhooks', []);
+        $webhooks = get_option('shopwalk_wc_webhooks', []);
         $id = count($webhooks) + 1;
 
         $webhooks[] = [
@@ -59,7 +59,7 @@ class Shopwalk_UCP_Webhooks {
             'active' => true,
         ];
 
-        update_option('shopwalk_ucp_webhooks', $webhooks);
+        update_option('shopwalk_wc_webhooks', $webhooks);
 
         return new WP_REST_Response([
             'id'     => $id,
@@ -70,30 +70,30 @@ class Shopwalk_UCP_Webhooks {
     }
 
     public function list_webhooks(WP_REST_Request $request): WP_REST_Response {
-        $webhooks = get_option('shopwalk_ucp_webhooks', []);
+        $webhooks = get_option('shopwalk_wc_webhooks', []);
         return new WP_REST_Response(['webhooks' => $webhooks], 200);
     }
 
     public function delete_webhook(WP_REST_Request $request): WP_REST_Response {
         $id = (int) $request->get_param('id');
-        $webhooks = get_option('shopwalk_ucp_webhooks', []);
+        $webhooks = get_option('shopwalk_wc_webhooks', []);
 
         $webhooks = array_filter($webhooks, fn($wh) => ($wh['id'] ?? 0) !== $id);
-        update_option('shopwalk_ucp_webhooks', array_values($webhooks));
+        update_option('shopwalk_wc_webhooks', array_values($webhooks));
 
         return new WP_REST_Response(['status' => 'deleted'], 200);
     }
 
     /**
-     * Fire webhooks when a UCP order changes status.
+     * Fire webhooks when a Shopwalk order changes status.
      */
     public function on_order_status_changed(int $order_id, string $old_status, string $new_status, WC_Order $order): void {
-        // Only fire for UCP orders
-        if (!$order->get_meta('_ucp_session_id')) {
+        // Only fire for Shopwalk orders
+        if (!$order->get_meta('_shopwalk_session_id')) {
             return;
         }
 
-        $webhooks = get_option('shopwalk_ucp_webhooks', []);
+        $webhooks = get_option('shopwalk_wc_webhooks', []);
         if (empty($webhooks)) {
             return;
         }
@@ -106,8 +106,8 @@ class Shopwalk_UCP_Webhooks {
         }
 
         $payload = [
-            'event'     => $event_type,
-            'order_id'  => 'ucp_order_' . $order_id,
+            'event'      => $event_type,
+            'order_id'   => 'sw_order_' . $order_id,
             'old_status' => $old_status,
             'new_status' => $new_status,
             'timestamp'  => current_time('c'),
@@ -126,16 +126,16 @@ class Shopwalk_UCP_Webhooks {
     }
 
     private function send_webhook(array $webhook, array $payload): void {
-        $body = wp_json_encode($payload);
+        $body      = wp_json_encode($payload);
         $signature = hash_hmac('sha256', $body, $webhook['secret'] ?? '');
 
         wp_remote_post($webhook['url'], [
             'timeout' => 15,
             'headers' => [
-                'Content-Type'          => 'application/json',
-                'X-UCP-Signature'       => $signature,
-                'X-UCP-Event'           => $payload['event'],
-                'User-Agent'            => 'ShopwalkUCP/' . SHOPWALK_UCP_VERSION,
+                'Content-Type'       => 'application/json',
+                'X-Shopwalk-Sig'     => $signature,
+                'X-Shopwalk-Event'   => $payload['event'],
+                'User-Agent'         => 'Shopwalk-WC/' . SHOPWALK_WC_VERSION,
             ],
             'body' => $body,
         ]);

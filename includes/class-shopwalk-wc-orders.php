@@ -1,27 +1,27 @@
 <?php
 /**
- * UCP Orders API — exposes order status and tracking for completed checkouts.
+ * Orders API — exposes order status and tracking for completed checkouts.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP_Orders {
+class Shopwalk_WC_Orders {
 
     public function register_routes(string $namespace): void {
-        // Get order by UCP order ID
+        // Get order by Shopwalk order ID
         register_rest_route($namespace, '/orders/(?P<id>[a-zA-Z0-9_-]+)', [
             'methods'             => 'GET',
             'callback'            => [$this, 'get_order'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // List orders for a buyer (by email)
         register_rest_route($namespace, '/orders', [
             'methods'             => 'GET',
             'callback'            => [$this, 'list_orders'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
             'args' => [
                 'email'    => ['type' => 'string', 'required' => true],
                 'page'     => ['type' => 'integer', 'default' => 1],
@@ -33,15 +33,15 @@ class Shopwalk_UCP_Orders {
         register_rest_route($namespace, '/orders/(?P<id>[a-zA-Z0-9_-]+)/adjustments', [
             'methods'             => 'POST',
             'callback'            => [$this, 'create_adjustment'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
     }
 
     /**
-     * Get order details in UCP format.
+     * Get order details.
      */
     public function get_order(WP_REST_Request $request): WP_REST_Response {
-        $order = $this->find_ucp_order($request->get_param('id'));
+        $order = $this->find_shopwalk_order($request->get_param('id'));
         if (!$order) {
             return new WP_REST_Response(['error' => 'Order not found'], 404);
         }
@@ -63,7 +63,7 @@ class Shopwalk_UCP_Orders {
             'page'          => $page,
             'orderby'       => 'date',
             'order'         => 'DESC',
-            'meta_key'      => '_ucp_status',
+            'meta_key'      => '_shopwalk_status',
             'meta_value'    => 'completed',
         ]);
 
@@ -82,7 +82,7 @@ class Shopwalk_UCP_Orders {
      * Create a return/refund adjustment.
      */
     public function create_adjustment(WP_REST_Request $request): WP_REST_Response {
-        $order = $this->find_ucp_order($request->get_param('id'));
+        $order = $this->find_shopwalk_order($request->get_param('id'));
         if (!$order) {
             return new WP_REST_Response(['error' => 'Order not found'], 404);
         }
@@ -96,9 +96,9 @@ class Shopwalk_UCP_Orders {
             $refund_amount = $amount ? $amount / 100 : (float) $order->get_total();
 
             $refund = wc_create_refund([
-                'order_id'   => $order->get_id(),
-                'amount'     => $refund_amount,
-                'reason'     => $reason,
+                'order_id'       => $order->get_id(),
+                'amount'         => $refund_amount,
+                'reason'         => $reason,
                 'refund_payment' => false, // Platform handles actual payment refund
             ]);
 
@@ -120,15 +120,15 @@ class Shopwalk_UCP_Orders {
 
     // --- Helpers ---
 
-    private function find_ucp_order(string $ucp_order_id): ?WC_Order {
-        // Format: ucp_order_{order_id}
-        $order_id = (int) str_replace(['ucp_order_', 'ucp_'], '', $ucp_order_id);
-        if ($order_id <= 0) {
+    private function find_shopwalk_order(string $order_id): ?WC_Order {
+        // Format: sw_order_{order_id}
+        $wc_order_id = (int) str_replace(['sw_order_', 'sw_'], '', $order_id);
+        if ($wc_order_id <= 0) {
             return null;
         }
 
-        $order = wc_get_order($order_id);
-        return ($order && $order->get_meta('_ucp_status') === 'completed') ? $order : null;
+        $order = wc_get_order($wc_order_id);
+        return ($order && $order->get_meta('_shopwalk_status') === 'completed') ? $order : null;
     }
 
     private function format_order(WC_Order $order): array {
@@ -189,8 +189,8 @@ class Shopwalk_UCP_Orders {
         }
 
         return [
-            'id'            => 'ucp_order_' . $order->get_id(),
-            'checkout_id'   => 'ucp_' . $order->get_id(),
+            'id'            => 'sw_order_' . $order->get_id(),
+            'checkout_id'   => 'sw_' . $order->get_id(),
             'status'        => $order->get_status(),
             'permalink_url' => $order->get_view_order_url(),
             'line_items'    => $line_items,

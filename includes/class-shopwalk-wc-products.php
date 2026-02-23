@@ -1,20 +1,20 @@
 <?php
 /**
- * UCP Catalog / Products API — exposes WooCommerce products in UCP format.
+ * Catalog / Products API — exposes WooCommerce products for Shopwalk AI.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP_Products {
+class Shopwalk_WC_Products {
 
     public function register_routes(string $namespace): void {
         // List products (public catalog)
         register_rest_route($namespace, '/products', [
             'methods'             => 'GET',
             'callback'            => [$this, 'list_products'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_public_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_public_permission'],
             'args'                => [
                 'page'     => ['type' => 'integer', 'default' => 1, 'minimum' => 1],
                 'per_page' => ['type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 100],
@@ -27,19 +27,19 @@ class Shopwalk_UCP_Products {
         register_rest_route($namespace, '/products/(?P<id>\d+)', [
             'methods'             => 'GET',
             'callback'            => [$this, 'get_product'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_public_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_public_permission'],
         ]);
 
         // List categories
         register_rest_route($namespace, '/categories', [
             'methods'             => 'GET',
             'callback'            => [$this, 'list_categories'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_public_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_public_permission'],
         ]);
     }
 
     /**
-     * List products in UCP-normalized format.
+     * List products in normalized format.
      */
     public function list_products(WP_REST_Request $request): WP_REST_Response {
         $page     = $request->get_param('page');
@@ -48,11 +48,11 @@ class Shopwalk_UCP_Products {
         $category = $request->get_param('category');
 
         $args = [
-            'status'   => 'publish',
-            'limit'    => $per_page,
-            'page'     => $page,
-            'orderby'  => 'date',
-            'order'    => 'DESC',
+            'status'  => 'publish',
+            'limit'   => $per_page,
+            'page'    => $page,
+            'orderby' => 'date',
+            'order'   => 'DESC',
         ];
 
         if ($search) {
@@ -70,8 +70,8 @@ class Shopwalk_UCP_Products {
         $products = $query->get_products();
 
         // Get total count
-        $count_args = $args;
-        $count_args['limit'] = -1;
+        $count_args           = $args;
+        $count_args['limit']  = -1;
         $count_args['return'] = 'ids';
         $total = count((new WC_Product_Query($count_args))->get_products());
 
@@ -133,7 +133,7 @@ class Shopwalk_UCP_Products {
     }
 
     /**
-     * Format a WC_Product into UCP-normalized JSON.
+     * Format a WC_Product into normalized JSON for Shopwalk.
      */
     private function format_product(WC_Product $product, bool $detailed = false): array {
         $images = [];

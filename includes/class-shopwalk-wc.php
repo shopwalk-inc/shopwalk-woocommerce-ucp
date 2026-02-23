@@ -2,14 +2,14 @@
 /**
  * Main plugin class — singleton orchestrator.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP {
+class Shopwalk_WC {
 
-    private static ?Shopwalk_UCP $instance = null;
+    private static ?Shopwalk_WC $instance = null;
 
     public static function instance(): self {
         if (null === self::$instance) {
@@ -47,30 +47,30 @@ class Shopwalk_UCP {
 
         // Admin settings
         if (is_admin()) {
-            Shopwalk_UCP_Settings::instance();
+            Shopwalk_WC_Settings::instance();
         }
     }
 
     /**
-     * Register REST API routes under /wp-json/shopwalk-ucp/v1/
+     * Register REST API routes under /wp-json/shopwalk-wc/v1/
      */
     public function register_routes(): void {
-        $namespace = 'shopwalk-ucp/v1';
+        $namespace = 'shopwalk-wc/v1';
 
         // Products / Catalog
-        $products = new Shopwalk_UCP_Products();
+        $products = new Shopwalk_WC_Products();
         $products->register_routes($namespace);
 
         // Checkout Sessions
-        $checkout = new Shopwalk_UCP_Checkout();
+        $checkout = new Shopwalk_WC_Checkout();
         $checkout->register_routes($namespace);
 
         // Orders
-        $orders = new Shopwalk_UCP_Orders();
+        $orders = new Shopwalk_WC_Orders();
         $orders->register_routes($namespace);
 
         // Webhooks
-        $webhooks = new Shopwalk_UCP_Webhooks();
+        $webhooks = new Shopwalk_WC_Webhooks();
         $webhooks->register_routes($namespace);
     }
 
@@ -80,25 +80,25 @@ class Shopwalk_UCP {
     public function register_well_known(): void {
         add_rewrite_rule(
             '^\.well-known/ucp/?$',
-            'index.php?shopwalk_ucp_well_known=1',
+            'index.php?shopwalk_wc_well_known=1',
             'top'
         );
     }
 
     public function add_query_vars(array $vars): array {
-        $vars[] = 'shopwalk_ucp_well_known';
+        $vars[] = 'shopwalk_wc_well_known';
         return $vars;
     }
 
     /**
-     * Serve the UCP Business Profile at /.well-known/ucp
+     * Serve the Business Profile at /.well-known/ucp
      */
     public function handle_well_known(): void {
-        if (!get_query_var('shopwalk_ucp_well_known')) {
+        if (!get_query_var('shopwalk_wc_well_known')) {
             return;
         }
 
-        $profile = Shopwalk_UCP_Profile::get_business_profile();
+        $profile = Shopwalk_WC_Profile::get_business_profile();
 
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: public, max-age=3600');

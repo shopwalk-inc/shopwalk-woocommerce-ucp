@@ -1,61 +1,60 @@
 <?php
 /**
- * UCP Checkout Sessions — creates and manages WooCommerce orders via UCP protocol.
+ * Checkout Sessions — creates and manages WooCommerce orders via Shopwalk integration.
  *
- * @package ShopwalkUCP
+ * @package ShopwalkWC
  */
 
 defined('ABSPATH') || exit;
 
-class Shopwalk_UCP_Checkout {
+class Shopwalk_WC_Checkout {
 
     public function register_routes(string $namespace): void {
         // Create checkout session
         register_rest_route($namespace, '/checkout-sessions', [
             'methods'             => 'POST',
             'callback'            => [$this, 'create_session'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // Get checkout session
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)', [
             'methods'             => 'GET',
             'callback'            => [$this, 'get_session'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // Update checkout session (add buyer info, fulfillment, payment)
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)', [
             'methods'             => 'PUT',
             'callback'            => [$this, 'update_session'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // Complete checkout (place the order)
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)/complete', [
             'methods'             => 'POST',
             'callback'            => [$this, 'complete_session'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // Cancel checkout
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)/cancel', [
             'methods'             => 'POST',
             'callback'            => [$this, 'cancel_session'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
         // Get available shipping methods for a session
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)/shipping-options', [
             'methods'             => 'GET',
             'callback'            => [$this, 'get_shipping_options'],
-            'permission_callback' => [Shopwalk_UCP_Auth::class, 'check_permission'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
     }
 
     /**
      * Create a new checkout session from line items.
-     * UCP: POST /checkout-sessions
      */
     public function create_session(WP_REST_Request $request): WP_REST_Response {
         $body = $request->get_json_params();
@@ -104,10 +103,10 @@ class Shopwalk_UCP_Checkout {
         $order->calculate_totals();
         $order->save();
 
-        // Store UCP session ID as order meta
-        $session_id = 'ucp_' . $order->get_id();
-        $order->update_meta_data('_ucp_session_id', $session_id);
-        $order->update_meta_data('_ucp_status', 'open');
+        // Store session ID as order meta
+        $session_id = 'sw_' . $order->get_id();
+        $order->update_meta_data('_shopwalk_session_id', $session_id);
+        $order->update_meta_data('_shopwalk_status', 'open');
         $order->save();
 
         return new WP_REST_Response($this->format_session($order, $messages), 201);
@@ -176,14 +175,14 @@ class Shopwalk_UCP_Checkout {
         // Update selected shipping method
         if (isset($body['fulfillment']['groups'][0]['selected_option_id'])) {
             $shipping_id = $body['fulfillment']['groups'][0]['selected_option_id'];
-            $order->update_meta_data('_ucp_selected_shipping', $shipping_id);
+            $order->update_meta_data('_shopwalk_selected_shipping', $shipping_id);
         }
 
         // Update payment selection
         if (isset($body['payment']['instruments'][0])) {
             $instrument = $body['payment']['instruments'][0];
             $order->set_payment_method($instrument['handler_id'] ?? 'stripe');
-            $order->update_meta_data('_ucp_payment_token', $instrument['id'] ?? '');
+            $order->update_meta_data('_shopwalk_payment_token', $instrument['id'] ?? '');
         }
 
         $order->calculate_totals();
@@ -201,8 +200,8 @@ class Shopwalk_UCP_Checkout {
             return new WP_REST_Response(['error' => 'Session not found'], 404);
         }
 
-        $ucp_status = $order->get_meta('_ucp_status');
-        if ($ucp_status === 'completed') {
+        $shopwalk_status = $order->get_meta('_shopwalk_status');
+        if ($shopwalk_status === 'completed') {
             return new WP_REST_Response(['error' => 'Session already completed'], 409);
         }
 
@@ -225,12 +224,12 @@ class Shopwalk_UCP_Checkout {
         // Process payment (placeholder — real payment processing depends on gateway)
         $body = $request->get_json_params();
         if (isset($body['payment_mandate'])) {
-            $order->update_meta_data('_ucp_payment_mandate', wp_json_encode($body['payment_mandate']));
+            $order->update_meta_data('_shopwalk_payment_mandate', wp_json_encode($body['payment_mandate']));
         }
 
         // Mark as processing
         $order->set_status('processing');
-        $order->update_meta_data('_ucp_status', 'completed');
+        $order->update_meta_data('_shopwalk_status', 'completed');
         $order->save();
 
         // Reduce stock
@@ -240,8 +239,8 @@ class Shopwalk_UCP_Checkout {
         do_action('woocommerce_checkout_order_processed', $order->get_id(), [], $order);
 
         return new WP_REST_Response([
-            'id'            => 'ucp_order_' . $order->get_id(),
-            'checkout_id'   => 'ucp_' . $order->get_id(),
+            'id'            => 'sw_order_' . $order->get_id(),
+            'checkout_id'   => 'sw_' . $order->get_id(),
             'permalink_url' => $order->get_view_order_url(),
             'line_items'    => $this->format_line_items($order),
             'totals'        => $this->format_totals($order),
@@ -266,7 +265,7 @@ class Shopwalk_UCP_Checkout {
         }
 
         $order->set_status('cancelled');
-        $order->update_meta_data('_ucp_status', 'cancelled');
+        $order->update_meta_data('_shopwalk_status', 'cancelled');
         $order->save();
 
         return new WP_REST_Response(['status' => 'cancelled'], 200);
@@ -334,8 +333,8 @@ class Shopwalk_UCP_Checkout {
     // --- Helpers ---
 
     private function find_order_by_session_id(string $session_id): ?WC_Order {
-        // Session ID format: ucp_{order_id}
-        $order_id = (int) str_replace('ucp_', '', $session_id);
+        // Session ID format: sw_{order_id}
+        $order_id = (int) str_replace('sw_', '', $session_id);
         if ($order_id <= 0) {
             return null;
         }
@@ -345,8 +344,8 @@ class Shopwalk_UCP_Checkout {
             return null;
         }
 
-        // Verify it's a UCP session
-        if ($order->get_meta('_ucp_session_id') !== $session_id) {
+        // Verify it's a Shopwalk session
+        if ($order->get_meta('_shopwalk_session_id') !== $session_id) {
             return null;
         }
 
@@ -354,12 +353,12 @@ class Shopwalk_UCP_Checkout {
     }
 
     private function format_session(WC_Order $order, array $extra_messages = []): array {
-        $session_id = $order->get_meta('_ucp_session_id') ?: 'ucp_' . $order->get_id();
-        $ucp_status = $order->get_meta('_ucp_status') ?: 'open';
+        $session_id      = $order->get_meta('_shopwalk_session_id') ?: 'sw_' . $order->get_id();
+        $shopwalk_status = $order->get_meta('_shopwalk_status') ?: 'open';
 
         $session = [
             'id'         => $session_id,
-            'status'     => $ucp_status,
+            'status'     => $shopwalk_status,
             'currency'   => $order->get_currency(),
             'line_items' => $this->format_line_items($order),
             'totals'     => $this->format_totals($order),
