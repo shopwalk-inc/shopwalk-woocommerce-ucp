@@ -148,7 +148,7 @@ class Shopwalk_WC_Webhooks {
             'timestamp' => time(),
         ];
 
-        $api_key = get_option('shopwalk_wc_shopwalk_api_key', '');
+        $api_key = get_option('shopwalk_wc_plugin_key', '');
         $body    = wp_json_encode($payload);
         $hmac    = hash_hmac('sha256', $body, $api_key);
 

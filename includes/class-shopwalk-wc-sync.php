@@ -29,18 +29,17 @@ class Shopwalk_WC_Sync {
     }
 
     /**
-     * Get the Shopwalk API key from settings.
+     * Get the Shopwalk plugin key from settings (unified key).
      */
     private function get_api_key(): string {
-        return get_option('shopwalk_wc_shopwalk_api_key', '');
+        return get_option('shopwalk_wc_plugin_key', '');
     }
 
     /**
-     * Get the Shopwalk API base URL from settings.
+     * Get the Shopwalk API base URL (hardcoded).
      */
     private function get_api_url(): string {
-        $base = get_option('shopwalk_wc_shopwalk_api_url', 'https://api.shopwalk.com');
-        return rtrim($base, '/') . '/api/v1/products/ingest';
+        return 'https://api.shopwalk.com/api/v1/products/ingest';
     }
 
     /**
@@ -95,8 +94,7 @@ class Shopwalk_WC_Sync {
         }
 
         $merchant_id = wp_parse_url(home_url(), PHP_URL_HOST);
-        $url = rtrim(get_option('shopwalk_wc_shopwalk_api_url', 'https://api.shopwalk.com'), '/')
-            . '/api/v1/products/ingest'
+        $url = 'https://api.shopwalk.com/api/v1/products/ingest'
             . '?external_id=' . urlencode((string) $product_id)
             . '&provider=woocommerce'
             . '&merchant_id=' . urlencode($merchant_id);

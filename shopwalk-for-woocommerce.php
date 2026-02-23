@@ -56,6 +56,7 @@ function shopwalk_wc_init() {
     require_once SHOPWALK_WC_PLUGIN_DIR . 'includes/class-shopwalk-wc-settings.php';
     require_once SHOPWALK_WC_PLUGIN_DIR . 'includes/class-shopwalk-wc-auth.php';
     require_once SHOPWALK_WC_PLUGIN_DIR . 'includes/class-shopwalk-wc-sync.php';
+    require_once SHOPWALK_WC_PLUGIN_DIR . 'includes/class-shopwalk-wc-updater.php';
 
     // Boot
     Shopwalk_WC::instance();

@@ -50,6 +50,9 @@ class Shopwalk_WC {
             Shopwalk_WC_Settings::instance();
         }
 
+        // Auto-updater (checks shopwalk.com for plugin updates)
+        Shopwalk_WC_Updater::instance();
+
         // Add version header to all Shopwalk REST responses
         add_filter('rest_post_dispatch', function($result, $server, $request) {
             if (strpos($request->get_route(), '/shopwalk-wc/') !== false) {
