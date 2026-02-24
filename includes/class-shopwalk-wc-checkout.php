@@ -75,9 +75,9 @@ class Shopwalk_WC_Checkout {
         // Add line items
         $messages = [];
         foreach ($line_items as $li) {
-            $product_id = $li['item']['id'] ?? null;
-            $variant_id = $li['item']['variant_id'] ?? null;
-            $quantity   = $li['quantity'] ?? 1;
+            $product_id = isset($li['item']['id']) ? absint($li['item']['id']) : null;
+            $variant_id = isset($li['item']['variant_id']) ? absint($li['item']['variant_id']) : null;
+            $quantity   = isset($li['quantity']) ? max(1, absint($li['quantity'])) : 1;
 
             // If variant_id provided, use variation product
             if ($variant_id) {
@@ -283,7 +283,7 @@ class Shopwalk_WC_Checkout {
                 'expectations' => [
                     [
                         'type'         => 'shipping',
-                        'estimated_at' => date('c', strtotime('+5 days')),
+                        'estimated_at' => gmdate('c', strtotime('+5 days')),
                     ],
                 ],
             ],

@@ -168,6 +168,8 @@ class Shopwalk_WC_Settings {
      * AJAX: re-run all AI Commerce Status checks and return JSON.
      */
     public function ajax_test_connection(): void {
+        check_ajax_referer('shopwalk_wc_test_connection', 'nonce');
+
         if (!current_user_can('manage_woocommerce')) {
             wp_send_json_error(['message' => 'Insufficient permissions.'], 403);
         }
@@ -315,8 +317,9 @@ class Shopwalk_WC_Settings {
         if ($hook !== 'woocommerce_page_wc-settings') {
             return;
         }
-        // phpcs:ignore WordPress.Security.NonceVerification
-        if (($GLOBALS['current_tab'] ?? '') !== 'shopwalk' && (!isset($_GET['tab']) || $_GET['tab'] !== 'shopwalk')) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $current_tab = isset($_GET['tab']) ? sanitize_text_field(wp_unslash($_GET['tab'])) : '';
+        if (($GLOBALS['current_tab'] ?? '') !== 'shopwalk' && $current_tab !== 'shopwalk') {
             return;
         }
 

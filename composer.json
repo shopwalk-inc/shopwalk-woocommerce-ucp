@@ -1,0 +1,21 @@
+{
+    "name": "shopwalk-inc/shopwalk-ai",
+    "description": "Shopwalk AI — WooCommerce plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0"
+    },
+    "require-dev": {
+        "woocommerce/qit-cli": "^0.7"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "qit:security": "qit run:security shopwalk-ai",
+        "qit:phpcs": "qit run:phpcs shopwalk-ai",
+        "qit:activation": "qit run:activation shopwalk-ai"
+    }
+}

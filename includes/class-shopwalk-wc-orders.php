@@ -25,7 +25,7 @@ class Shopwalk_WC_Orders {
             'callback'            => [$this, 'list_orders'],
             'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
             'args' => [
-                'email'    => ['type' => 'string', 'required' => true],
+                'email'    => ['type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_email'],
                 'page'     => ['type' => 'integer', 'default' => 1],
                 'per_page' => ['type' => 'integer', 'default' => 10],
             ],
@@ -90,9 +90,9 @@ class Shopwalk_WC_Orders {
         }
 
         $body   = $request->get_json_params();
-        $type   = $body['type'] ?? 'refund';
+        $type   = isset($body['type']) ? sanitize_key($body['type']) : 'refund';
         $amount = $body['amount'] ?? null;
-        $reason = $body['reason'] ?? '';
+        $reason = isset($body['reason']) ? sanitize_text_field($body['reason']) : '';
 
         if ($type === 'refund') {
             $refund_amount = $amount ? $amount / 100 : (float) $order->get_total();
