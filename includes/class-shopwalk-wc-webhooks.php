@@ -2,7 +2,9 @@
 /**
  * Webhooks — notifies Shopwalk about order status changes.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;
@@ -174,7 +176,7 @@ class Shopwalk_WC_Webhooks {
                 'Content-Type'       => 'application/json',
                 'X-Shopwalk-Sig'     => $signature,
                 'X-Shopwalk-Event'   => $payload['event'],
-                'User-Agent'         => 'Shopwalk-WC/' . SHOPWALK_WC_VERSION,
+                'User-Agent'         => 'Shopwalk-WC/' . SHOPWALK_AI_VERSION,
             ],
             'body' => $body,
         ]);

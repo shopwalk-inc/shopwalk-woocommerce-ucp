@@ -2,7 +2,9 @@
 /**
  * Business Profile — served at /.well-known/ucp
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;
@@ -27,7 +29,7 @@ class Shopwalk_WC_Profile {
             'url'         => $site_url,
             'logo'        => $logo,
             'shopwalk'    => [
-                'version'          => SHOPWALK_WC_VERSION,
+                'version'          => SHOPWALK_AI_VERSION,
                 'rest_endpoint'    => $rest_url,
                 'payment_handlers' => $payment_handlers,
             ],

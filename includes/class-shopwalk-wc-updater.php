@@ -5,7 +5,9 @@
  * Hooks into WP's plugin update transient and plugins_api filter so the plugin
  * appears in the standard WP Updates screen and can be updated with one click.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;
@@ -13,7 +15,7 @@ defined('ABSPATH') || exit;
 class Shopwalk_WC_Updater {
 
     private static ?self $instance = null;
-    private string $plugin_slug  = 'shopwalk-for-woocommerce';
+    private string $plugin_slug  = 'shopwalk-ai';
     private string $plugin_file;
     private string $update_url  = 'https://api.shopwalk.com/api/v1/plugin/check-update';
 
@@ -43,7 +45,7 @@ class Shopwalk_WC_Updater {
             return $transient;
         }
 
-        $installed_version = $transient->checked[$this->plugin_file] ?? SHOPWALK_WC_VERSION;
+        $installed_version = $transient->checked[$this->plugin_file] ?? SHOPWALK_AI_VERSION;
         if (version_compare($remote['new_version'], $installed_version, '>')) {
             $transient->response[$this->plugin_file] = (object) [
                 'id'          => $this->plugin_slug . '/' . $this->plugin_slug . '.php',
@@ -77,9 +79,9 @@ class Shopwalk_WC_Updater {
         }
 
         return (object) [
-            'name'          => 'Shopwalk for WooCommerce',
+            'name'          => 'Shopwalk AI',
             'slug'          => $this->plugin_slug,
-            'version'       => $remote['new_version'] ?? SHOPWALK_WC_VERSION,
+            'version'       => $remote['new_version'] ?? SHOPWALK_AI_VERSION,
             'author'        => '<a href="https://shopwalk.com">Shopwalk, Inc.</a>',
             'homepage'      => 'https://shopwalk.com/plugin',
             'download_link' => $remote['package'] ?? '',

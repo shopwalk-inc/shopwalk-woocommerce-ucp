@@ -2,7 +2,9 @@
 /**
  * Catalog / Products API — exposes WooCommerce products for Shopwalk AI.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;

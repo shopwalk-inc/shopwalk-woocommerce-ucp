@@ -2,7 +2,9 @@
 /**
  * Checkout Sessions — creates and manages WooCommerce orders via Shopwalk integration.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;

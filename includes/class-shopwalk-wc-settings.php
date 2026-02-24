@@ -2,7 +2,9 @@
 /**
  * Plugin Settings — WooCommerce settings tab for Shopwalk configuration.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;
@@ -35,7 +37,7 @@ class Shopwalk_WC_Settings {
     }
 
     public function add_settings_tab(array $tabs): array {
-        $tabs['shopwalk'] = __('Shopwalk', 'shopwalk-for-woocommerce');
+        $tabs['shopwalk'] = __('Shopwalk', 'shopwalk-ai');
         return $tabs;
     }
 
@@ -295,10 +297,10 @@ class Shopwalk_WC_Settings {
 
         $html .= '<p style="margin-top:12px;">';
         $html .= '<button type="button" id="shopwalk-test-connection" class="button button-secondary">'
-            . esc_html__('Test Connection', 'shopwalk-for-woocommerce')
+            . esc_html__('Test Connection', 'shopwalk-ai')
             . '</button>';
         $html .= '<button type="button" id="shopwalk-sync-now" class="button button-secondary" style="margin-left:8px;">'
-            . esc_html__('Sync Products Now', 'shopwalk-for-woocommerce')
+            . esc_html__('Sync Products Now', 'shopwalk-ai')
             . '</button>';
         $html .= '<span id="shopwalk-connection-result" style="margin-left:10px;"></span>';
         $html .= '</p>';
@@ -320,9 +322,9 @@ class Shopwalk_WC_Settings {
 
         wp_enqueue_script(
             'shopwalk-wc-admin',
-            SHOPWALK_WC_PLUGIN_URL . 'assets/admin.js',
+            SHOPWALK_AI_PLUGIN_URL . 'assets/admin.js',
             ['jquery'],
-            SHOPWALK_WC_VERSION,
+            SHOPWALK_AI_VERSION,
             true
         );
 
@@ -331,12 +333,12 @@ class Shopwalk_WC_Settings {
             'nonce'           => wp_create_nonce('shopwalk_wc_sync_all'),
             'testNonce'       => wp_create_nonce('shopwalk_wc_test_connection'),
             'i18n'            => [
-                'syncing'    => __('Syncing...', 'shopwalk-for-woocommerce'),
-                'syncNow'    => __('Sync Products Now', 'shopwalk-for-woocommerce'),
-                'testing'    => __('Testing...', 'shopwalk-for-woocommerce'),
-                'testConn'   => __('Test Connection', 'shopwalk-for-woocommerce'),
-                'success'    => __('Sync complete!', 'shopwalk-for-woocommerce'),
-                'error'      => __('Request failed. Check your Plugin Key.', 'shopwalk-for-woocommerce'),
+                'syncing'    => __('Syncing...', 'shopwalk-ai'),
+                'syncNow'    => __('Sync Products Now', 'shopwalk-ai'),
+                'testing'    => __('Testing...', 'shopwalk-ai'),
+                'testConn'   => __('Test Connection', 'shopwalk-ai'),
+                'success'    => __('Sync complete!', 'shopwalk-ai'),
+                'error'      => __('Request failed. Check your Plugin Key.', 'shopwalk-ai'),
             ],
         ]);
     }
@@ -344,46 +346,46 @@ class Shopwalk_WC_Settings {
     private function get_settings(): array {
         return [
             'section_title' => [
-                'name' => __('Shopwalk Settings', 'shopwalk-for-woocommerce'),
+                'name' => __('Shopwalk Settings', 'shopwalk-ai'),
                 'type' => 'title',
-                'desc' => __('Connect your store to Shopwalk — the AI shopping platform that automatically syncs your products and helps customers discover and buy from you.', 'shopwalk-for-woocommerce'),
+                'desc' => __('Connect your store to Shopwalk — the AI shopping platform that automatically syncs your products and helps customers discover and buy from you.', 'shopwalk-ai'),
                 'id'   => 'shopwalk_wc_section_title',
             ],
             'plugin_key' => [
-                'name'        => __('Plugin Key', 'shopwalk-for-woocommerce'),
+                'name'        => __('Plugin Key', 'shopwalk-ai'),
                 'type'        => 'password',
-                'desc'        => __('Your Shopwalk plugin key. Get one at shopwalk.com/plugin.', 'shopwalk-for-woocommerce'),
+                'desc'        => __('Your Shopwalk plugin key. Get one at shopwalk.com/plugin.', 'shopwalk-ai'),
                 'id'          => 'shopwalk_wc_plugin_key',
                 'default'     => '',
                 'desc_tip'    => true,
                 'placeholder' => 'sw_plugin_...',
             ],
             'api_key' => [
-                'name'     => __('Inbound API Key', 'shopwalk-for-woocommerce'),
+                'name'     => __('Inbound API Key', 'shopwalk-ai'),
                 'type'     => 'text',
-                'desc'     => __('Set an API key to secure checkout and order endpoints. Leave blank to allow open access (not recommended for production).', 'shopwalk-for-woocommerce'),
+                'desc'     => __('Set an API key to secure checkout and order endpoints. Leave blank to allow open access (not recommended for production).', 'shopwalk-ai'),
                 'id'       => 'shopwalk_wc_api_key',
                 'default'  => '',
                 'desc_tip' => true,
             ],
             'enable_catalog' => [
-                'name'    => __('Enable Catalog API', 'shopwalk-for-woocommerce'),
+                'name'    => __('Enable Catalog API', 'shopwalk-ai'),
                 'type'    => 'checkbox',
-                'desc'    => __('Allow Shopwalk AI to browse your product catalog.', 'shopwalk-for-woocommerce'),
+                'desc'    => __('Allow Shopwalk AI to browse your product catalog.', 'shopwalk-ai'),
                 'id'      => 'shopwalk_wc_enable_catalog',
                 'default' => 'yes',
             ],
             'enable_checkout' => [
-                'name'    => __('Enable Checkout API', 'shopwalk-for-woocommerce'),
+                'name'    => __('Enable Checkout API', 'shopwalk-ai'),
                 'type'    => 'checkbox',
-                'desc'    => __('Allow Shopwalk AI to create checkout sessions and place orders.', 'shopwalk-for-woocommerce'),
+                'desc'    => __('Allow Shopwalk AI to create checkout sessions and place orders.', 'shopwalk-ai'),
                 'id'      => 'shopwalk_wc_enable_checkout',
                 'default' => 'yes',
             ],
             'enable_webhooks' => [
-                'name'    => __('Enable Webhooks', 'shopwalk-for-woocommerce'),
+                'name'    => __('Enable Webhooks', 'shopwalk-ai'),
                 'type'    => 'checkbox',
-                'desc'    => __('Send order status notifications to Shopwalk.', 'shopwalk-for-woocommerce'),
+                'desc'    => __('Send order status notifications to Shopwalk.', 'shopwalk-ai'),
                 'id'      => 'shopwalk_wc_enable_webhooks',
                 'default' => 'yes',
             ],
@@ -392,7 +394,7 @@ class Shopwalk_WC_Settings {
                 'id'   => 'shopwalk_wc_section_end',
             ],
             'ai_status_title' => [
-                'name' => __('AI Commerce Status', 'shopwalk-for-woocommerce'),
+                'name' => __('AI Commerce Status', 'shopwalk-ai'),
                 'type' => 'title',
                 'desc' => $this->get_ai_status_html(),
                 'id'   => 'shopwalk_wc_ai_status_title',

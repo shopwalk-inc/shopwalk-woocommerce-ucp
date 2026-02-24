@@ -2,7 +2,9 @@
 /**
  * Main plugin class — singleton orchestrator.
  *
- * @package ShopwalkWC
+ * @package ShopwalkAI
+ * @license GPL-2.0-or-later
+ * @copyright Copyright (c) 2024-2026 Shopwalk, Inc.
  */
 
 defined('ABSPATH') || exit;
@@ -56,7 +58,7 @@ class Shopwalk_WC {
         // Add version header to all Shopwalk REST responses
         add_filter('rest_post_dispatch', function($result, $server, $request) {
             if (strpos($request->get_route(), '/shopwalk-wc/') !== false) {
-                $result->header('X-Shopwalk-WC-Version', SHOPWALK_WC_VERSION);
+                $result->header('X-Shopwalk-WC-Version', SHOPWALK_AI_VERSION);
             }
             return $result;
         }, 10, 3);

@@ -1,6 +1,6 @@
-=== Shopwalk for WooCommerce ===
+=== Shopwalk AI ===
 Contributors: shopwalkinc
-Tags: ai shopping, product sync, woocommerce, shopwalk, ecommerce
+Tags: ai shopping, product sync, woocommerce, ai commerce, ai checkout
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -8,47 +8,57 @@ Stable tag: 1.0.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect your WooCommerce store to Shopwalk — the AI-powered shopping platform that helps customers find exactly what they're looking for.
+AI-enable your WooCommerce store in minutes. Let AI agents discover, browse, and buy from your store automatically.
 
 == Description ==
 
-**Shopwalk for WooCommerce** connects your store to the Shopwalk AI shopping platform, automatically syncing your products so customers can discover and buy from you through Shopwalk's AI-powered search.
+**Shopwalk AI** makes your WooCommerce store visible and accessible to AI shopping agents. Install the plugin, enter your license key, and your store is instantly open to AI-powered discovery, browsing, and checkout — no developer required.
 
-= What Shopwalk Does =
+= What It Does =
 
-Shopwalk is an AI shopping engine that understands natural language queries and connects shoppers with the right products across thousands of independent stores. When a shopper searches for something on Shopwalk, your products appear in relevant results — driving qualified traffic directly to your store.
+Modern shoppers increasingly use AI to find and buy products. Shopwalk AI bridges the gap between your WooCommerce store and the AI commerce layer, so your products surface in AI-driven search results and AI agents can complete purchases on behalf of shoppers.
 
 = Features =
 
 * **Automatic product sync** — Your entire catalog syncs to Shopwalk automatically. New products, price changes, and inventory updates propagate in real time.
-* **AI-powered discovery** — Shopwalk's AI understands context and intent, surfacing your products to the right shoppers at the right time.
-* **Seamless checkout** — Shoppers complete purchases directly on your WooCommerce store. No redirects, no middleman, no fees.
-* **Order management** — Track orders placed through Shopwalk alongside your regular WooCommerce orders.
-* **Simple setup** — Connect in minutes with your Shopwalk API key. No technical knowledge required.
+* **AI discovery** — Your products surface in AI-powered searches. Shopwalk AI understands natural language and context to connect the right shoppers with your store.
+* **AI browsing** — AI agents can browse your full catalog via a structured REST API, reading product details, categories, pricing, and availability.
+* **AI checkout** — AI agents can create checkout sessions and place orders directly through your WooCommerce store using the Universal Commerce Protocol (UCP). No redirects, no middleman, no transaction fees.
+* **Order webhooks** — Real-time order status notifications keep AI agents in sync with your fulfillment workflow.
+* **Simple setup** — Connect in minutes with your Shopwalk license key. No technical knowledge required.
 
 = Getting Started =
 
 1. Install and activate the plugin
 2. Go to **WooCommerce → Settings → Shopwalk**
-3. Enter your Shopwalk API key (get one free at [shopwalk.com](https://shopwalk.com))
+3. Enter your Shopwalk license key (purchase at [shopwalk.com](https://shopwalk.com))
 4. Your products will begin syncing immediately
 
-= Privacy =
+= Privacy & External Services =
 
-This plugin sends product data (name, description, price, images, inventory) to the Shopwalk API (api.shopwalk.com) for indexing. No customer personal data is ever shared with Shopwalk. Order processing happens entirely within your WooCommerce store.
+This plugin communicates with the Shopwalk API (`api.shopwalk.com`) for the following purposes:
+
+* **Product sync** — sends product data (name, description, price, images, inventory status) to Shopwalk for AI indexing when products are saved or updated.
+* **License activation** — sends your site URL and license key to Shopwalk to validate your license.
+* **Update checks** — periodically checks for plugin updates via the Shopwalk update API.
+* **Order webhooks** — sends order status data to Shopwalk when orders placed via AI checkout change status.
+
+No customer personal data (names, addresses, payment info) is ever sent to Shopwalk. All payment processing and order management remains entirely within your WooCommerce store.
+
+By using this plugin, you agree to the [Shopwalk Terms of Service](https://shopwalk.com/terms) and [Privacy Policy](https://shopwalk.com/privacy).
 
 == Installation ==
 
-1. Upload the `shopwalk-for-woocommerce` folder to `/wp-content/plugins/`
+1. Upload the `shopwalk-ai` folder to `/wp-content/plugins/`
 2. Activate the plugin through **Plugins → Installed Plugins**
-3. Go to **WooCommerce → Settings → Shopwalk** and enter your API key
+3. Go to **WooCommerce → Settings → Shopwalk** and enter your license key
 4. Your products will start syncing to Shopwalk automatically
 
 == Frequently Asked Questions ==
 
-= Is Shopwalk free? =
+= How do I get a license key? =
 
-Yes, getting your store listed on Shopwalk is free. Create an account at shopwalk.com to get your API key.
+Purchase a license key at [shopwalk.com](https://shopwalk.com). Each license covers one WooCommerce store.
 
 = What products get synced? =
 
@@ -56,15 +66,23 @@ All published WooCommerce products including simple, variable, and grouped produ
 
 = How often does the catalog sync? =
 
-Products sync in real time when created or updated. A full catalog sync also runs automatically every 6 hours.
+Products sync in real time when created or updated. You can also trigger a full manual sync from the plugin settings page.
 
-= Does Shopwalk take a commission? =
+= Does Shopwalk take a commission on sales? =
 
-No. Shopwalk drives traffic to your store and you process orders through your own WooCommerce checkout. No transaction fees.
+No. AI agents complete purchases through your own WooCommerce checkout. Shopwalk does not sit in the payment flow and does not charge transaction fees.
 
-= Can I control which products are visible on Shopwalk? =
+= What is the Universal Commerce Protocol (UCP)? =
 
-Yes. You can exclude individual products or categories from the Shopwalk catalog via the product editor.
+UCP is an open protocol that lets AI agents interact with e-commerce stores in a structured way — browsing products, creating checkout sessions, and placing orders. This plugin implements the UCP server on your WooCommerce store.
+
+= Is my customer data shared with Shopwalk? =
+
+No. Only product catalog data is sent to Shopwalk. Customer names, addresses, and payment information never leave your WooCommerce store.
+
+= Does this work with WooCommerce High-Performance Order Storage (HPOS)? =
+
+Yes. Shopwalk AI is fully compatible with WooCommerce HPOS (Custom Order Tables).
 
 == Changelog ==
 
@@ -72,8 +90,11 @@ Yes. You can exclude individual products or categories from the Shopwalk catalog
 * Initial release
 * Automatic product catalog sync
 * Real-time inventory and price updates
-* Shopwalk AI discovery integration
+* AI discovery integration
+* AI browsing REST API
+* AI checkout via Universal Commerce Protocol (UCP)
 * Order webhook support
+* HPOS compatibility
 
 == Upgrade Notice ==
 
