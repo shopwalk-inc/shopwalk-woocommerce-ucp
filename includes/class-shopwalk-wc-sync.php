@@ -48,6 +48,11 @@ class Shopwalk_WC_Sync {
      * Sync a product to Shopwalk.
      */
     public function sync_product(int $product_id, $product = null): void {
+        // Respect the "Sync products to Shopwalk" toggle in plugin settings.
+        if (get_option('shopwalk_wc_enable_sync', 'yes') !== 'yes') {
+            return;
+        }
+
         $api_key = $this->get_api_key();
         if (empty($api_key)) {
             return; // No API key configured — skip sync
@@ -90,6 +95,10 @@ class Shopwalk_WC_Sync {
      * Notify Shopwalk when a product is deleted.
      */
     public function delete_product(int $product_id): void {
+        if (get_option('shopwalk_wc_enable_sync', 'yes') !== 'yes') {
+            return;
+        }
+
         $api_key = $this->get_api_key();
         if (empty($api_key)) {
             return;

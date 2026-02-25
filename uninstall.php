@@ -20,6 +20,7 @@ $options = [
     // Core settings
     'shopwalk_wc_plugin_key',
     'shopwalk_wc_api_key',
+    'shopwalk_wc_enable_sync',
     'shopwalk_wc_enable_catalog',
     'shopwalk_wc_enable_checkout',
     'shopwalk_wc_enable_webhooks',

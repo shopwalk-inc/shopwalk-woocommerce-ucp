@@ -14,7 +14,7 @@
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * WC requires at least: 8.0
- * WC tested up to: 9.4
+ * WC tested up to: 9.5
  *
  * @package ShopwalkAI
  */
@@ -50,12 +50,22 @@ define('SHOPWALK_ERR_INVALID_ADDRESS',   'INVALID_ADDRESS');
 define('SHOPWALK_SESSION_TTL', 86400);
 
 /**
- * Declare WooCommerce HPOS (High-Performance Order Storage) compatibility.
+ * Declare WooCommerce feature compatibility.
+ * - HPOS (High-Performance Order Storage)
+ * - Cart and Checkout Blocks
  */
 add_action('before_woocommerce_init', function () {
     if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        // High-Performance Order Storage (HPOS / custom_order_tables)
         \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
             'custom_order_tables',
+            __FILE__,
+            true
+        );
+        // Cart and Checkout Blocks — this plugin is server-side only and
+        // has no frontend UI that conflicts with the block-based cart/checkout.
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'cart_checkout_blocks',
             __FILE__,
             true
         );

@@ -181,6 +181,7 @@ class Shopwalk_WC_Settings {
             'plugin_key'      => $new_plugin_key,
             'api_key'         => get_option('shopwalk_wc_api_key', ''),
             'shopwalk_api_url'=> 'https://api.shopwalk.com',
+            'enable_sync'     => get_option('shopwalk_wc_enable_sync', 'yes'),
             'enable_catalog'  => get_option('shopwalk_wc_enable_catalog', 'yes'),
             'enable_checkout' => get_option('shopwalk_wc_enable_checkout', 'yes'),
             'enable_webhooks' => get_option('shopwalk_wc_enable_webhooks', 'yes'),
@@ -251,7 +252,11 @@ class Shopwalk_WC_Settings {
 
         $plugin_key = get_option('shopwalk_wc_plugin_key', '');
         if (empty($plugin_key)) {
-            wp_send_json_error(['message' => 'No Plugin Key configured.'], 400);
+            wp_send_json_error(['message' => 'No Plugin Key configured. Connect your store first.'], 400);
+        }
+
+        if (get_option('shopwalk_wc_enable_sync', 'yes') !== 'yes') {
+            wp_send_json_error(['message' => 'Product sync is disabled in settings. Enable "Sync products to Shopwalk" and try again.'], 400);
         }
 
         $product_ids = wc_get_products([
@@ -503,6 +508,13 @@ class Shopwalk_WC_Settings {
                 'id'       => 'shopwalk_wc_api_key',
                 'default'  => '',
                 'desc_tip' => true,
+            ],
+            'enable_sync' => [
+                'name'    => __('Sync products to Shopwalk', 'shopwalk-ai'),
+                'type'    => 'checkbox',
+                'desc'    => __('Push product data (name, price, stock, images) to Shopwalk AI so your products appear in AI-powered searches. No customer or order data is ever shared. <a href="https://shopwalk.com/privacy" target="_blank">Privacy Policy</a>', 'shopwalk-ai'),
+                'id'      => 'shopwalk_wc_enable_sync',
+                'default' => 'yes',
             ],
             'enable_catalog' => [
                 'name'    => __('Enable Catalog API', 'shopwalk-ai'),

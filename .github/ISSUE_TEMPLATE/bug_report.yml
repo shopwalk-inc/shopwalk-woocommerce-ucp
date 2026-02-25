@@ -1,0 +1,97 @@
+name: Bug Report
+description: Something isn't working correctly
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Fill this out completely so we can reproduce and fix it quickly.
+        
+        **Security issues must NOT be reported here.** Email security@shopwalk.com instead.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin Version
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: wp-version
+    attributes:
+      label: WordPress Version
+      placeholder: "6.7.1"
+    validations:
+      required: true
+
+  - type: input
+    id: wc-version
+    attributes:
+      label: WooCommerce Version
+      placeholder: "9.4.0"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP Version
+      placeholder: "8.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: describe-bug
+    attributes:
+      label: Describe the Bug
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to WooCommerce → Settings → Shopwalk
+        2. Click '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Any relevant output from `wp-content/debug.log` or browser console.
+      render: text
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I am running the latest version of the plugin
+          required: true
+        - label: This is not a security vulnerability (those go to security@shopwalk.com)
+          required: true
