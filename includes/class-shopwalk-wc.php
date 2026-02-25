@@ -57,34 +57,42 @@ class Shopwalk_WC {
 
         // Add version header to all Shopwalk REST responses
         add_filter('rest_post_dispatch', function($result, $server, $request) {
-            if (strpos($request->get_route(), '/shopwalk-wc/') !== false) {
+            $route = $request->get_route();
+            if (strpos($route, '/shopwalk-wc/') !== false || strpos($route, '/shopwalk/') !== false) {
                 $result->header('X-Shopwalk-WC-Version', SHOPWALK_AI_VERSION);
+                $result->header('X-UCP-Version', '1.0');
             }
             return $result;
         }, 10, 3);
     }
 
     /**
-     * Register REST API routes under /wp-json/shopwalk-wc/v1/
+     * Register REST API routes.
+     *
+     * Routes are registered under two namespaces:
+     *   - shopwalk-wc/v1  (legacy — preserves backward compatibility)
+     *   - shopwalk/v1     (UCP-standard path)
      */
     public function register_routes(): void {
-        $namespace = 'shopwalk-wc/v1';
+        $namespaces = ['shopwalk-wc/v1', 'shopwalk/v1'];
 
-        // Products / Catalog
-        $products = new Shopwalk_WC_Products();
-        $products->register_routes($namespace);
+        foreach ($namespaces as $namespace) {
+            // Products / Catalog + Availability
+            $products = new Shopwalk_WC_Products();
+            $products->register_routes($namespace);
 
-        // Checkout Sessions
-        $checkout = new Shopwalk_WC_Checkout();
-        $checkout->register_routes($namespace);
+            // Checkout Sessions
+            $checkout = new Shopwalk_WC_Checkout();
+            $checkout->register_routes($namespace);
 
-        // Orders
-        $orders = new Shopwalk_WC_Orders();
-        $orders->register_routes($namespace);
+            // Orders + Refunds
+            $orders = new Shopwalk_WC_Orders();
+            $orders->register_routes($namespace);
 
-        // Webhooks
-        $webhooks = new Shopwalk_WC_Webhooks();
-        $webhooks->register_routes($namespace);
+            // Webhooks
+            $webhooks = new Shopwalk_WC_Webhooks();
+            $webhooks->register_routes($namespace);
+        }
     }
 
     /**
