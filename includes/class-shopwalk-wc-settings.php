@@ -31,6 +31,8 @@ class Shopwalk_WC_Settings {
         // AJAX handlers (logged-in admin)
         add_action('wp_ajax_shopwalk_wc_sync_all',         [$this, 'ajax_sync_all']);
         add_action('wp_ajax_shopwalk_wc_test_connection',  [$this, 'ajax_test_connection']);
+        add_action('wp_ajax_shopwalk_auto_register',       [$this, 'ajax_auto_register']);
+        add_action('wp_ajax_shopwalk_save_manual_key',     [$this, 'ajax_save_manual_key']);
 
         // Enqueue admin JS on our settings tab
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
@@ -42,7 +44,112 @@ class Shopwalk_WC_Settings {
     }
 
     public function settings_tab(): void {
+        $plugin_key = get_option('shopwalk_wc_plugin_key', '');
+        if (empty($plugin_key)) {
+            $this->render_connect_screen();
+            return;
+        }
         woocommerce_admin_fields($this->get_settings());
+    }
+
+    /**
+     * Render the "Connect your store" screen shown before any key is configured.
+     */
+    private function render_connect_screen(): void {
+        $nonce = wp_create_nonce('shopwalk_auto_register');
+        ?>
+        <div id="shopwalk-connect-screen" style="max-width:600px;margin:32px 0;background:#fff;border:1px solid #ddd;border-radius:8px;padding:36px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#0ea5e9"/>
+                    <path d="M10 18a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm8-5a1.5 1.5 0 0 0-1.5 1.5v3.5H13a1.5 1.5 0 0 0 0 3h3.5V25a1.5 1.5 0 0 0 3 0v-3.5H23a1.5 1.5 0 0 0 0-3h-3.5V14.5A1.5 1.5 0 0 0 18 13Z" fill="#fff"/>
+                </svg>
+                <div>
+                    <h2 style="margin:0;font-size:20px;font-weight:700;">Connect to Shopwalk AI</h2>
+                    <p style="margin:4px 0 0;color:#666;font-size:13px;">AI-enable your store in seconds — free, no credit card required</p>
+                </div>
+            </div>
+
+            <ul style="margin:0 0 24px 16px;padding:0;color:#444;font-size:14px;line-height:2;">
+                <li>✅ Your products become discoverable by AI agents worldwide</li>
+                <li>✅ Full UCP (Universal Commerce Protocol) support — AI can browse and buy</li>
+                <li>✅ Real-time product sync as you add or update items</li>
+                <li>✅ Free forever — no subscription required</li>
+            </ul>
+
+            <button type="button" id="shopwalk-auto-register-btn"
+                    class="button button-primary"
+                    style="background:#0ea5e9;border-color:#0ea5e9;font-size:15px;padding:8px 24px;height:auto;"
+                    data-nonce="<?php echo esc_attr($nonce); ?>">
+                Connect to Shopwalk AI — it's free
+            </button>
+
+            <p id="shopwalk-register-status" style="margin-top:12px;color:#666;font-size:13px;display:none;"></p>
+
+            <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+            <p style="margin:0;font-size:12px;color:#999;">
+                Already have a key?
+                <a href="#" id="shopwalk-show-manual-key" style="color:#0ea5e9;">Enter it manually →</a>
+            </p>
+            <div id="shopwalk-manual-key-form" style="display:none;margin-top:16px;">
+                <label style="display:block;font-weight:600;margin-bottom:6px;">Plugin Key</label>
+                <input type="password" id="shopwalk-manual-key-input" placeholder="sw_site_..." style="width:100%;max-width:400px;">
+                <button type="button" id="shopwalk-manual-key-save" class="button button-secondary" style="margin-top:8px;">Save Key</button>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * AJAX: auto-register this store with Shopwalk and store the returned API key.
+     */
+    public function ajax_auto_register(): void {
+        check_ajax_referer('shopwalk_auto_register', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions.'], 403);
+        }
+
+        $site_url   = home_url();
+        $store_name = get_bloginfo('name') ?: wp_parse_url($site_url, PHP_URL_HOST);
+        $admin_email = get_option('admin_email', '');
+
+        $response = wp_remote_post('https://api.shopwalk.com/api/v1/plugin/register', [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body'    => wp_json_encode([
+                'site_url'       => $site_url,
+                'store_name'     => $store_name,
+                'admin_email'    => $admin_email,
+                'wc_version'     => defined('WC_VERSION') ? WC_VERSION : '',
+                'plugin_version' => SHOPWALK_AI_VERSION,
+            ]),
+            'timeout' => 20,
+        ]);
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(['message' => 'Could not reach Shopwalk API: ' . $response->get_error_message()]);
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code !== 200 || empty($body['api_key'])) {
+            wp_send_json_error(['message' => $body['message'] ?? 'Registration failed. Please try again.']);
+        }
+
+        // Store the key and activate
+        update_option('shopwalk_wc_plugin_key', $body['api_key']);
+        update_option('shopwalk_wc_license_status', 'active');
+        if (!empty($body['merchant_id'])) {
+            update_option('shopwalk_wc_merchant_id', $body['merchant_id']);
+        }
+        flush_rewrite_rules();
+
+        wp_send_json_success([
+            'message'     => 'Your store is now connected to Shopwalk AI!',
+            'merchant_id' => $body['merchant_id'] ?? '',
+            'registered'  => $body['registered'] ?? true,
+        ]);
     }
 
     /**
@@ -107,6 +214,28 @@ class Shopwalk_WC_Settings {
             $body = json_decode(wp_remote_retrieve_body($response), true);
             update_option('shopwalk_wc_license_status', ($body['status'] ?? '') === 'ok' ? 'active' : 'invalid');
         }
+    }
+
+    /**
+     * AJAX: save a manually entered plugin key (for users with existing keys).
+     */
+    public function ajax_save_manual_key(): void {
+        check_ajax_referer('shopwalk_auto_register', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions.'], 403);
+        }
+
+        $key = sanitize_text_field(wp_unslash($_POST['plugin_key'] ?? ''));
+        if (empty($key)) {
+            wp_send_json_error(['message' => 'Plugin key is required.']);
+        }
+
+        update_option('shopwalk_wc_plugin_key', $key);
+        update_option('shopwalk_wc_license_status', 'active');
+        flush_rewrite_rules();
+
+        wp_send_json_success(['message' => 'Key saved successfully.']);
     }
 
     /**
@@ -335,13 +464,17 @@ class Shopwalk_WC_Settings {
             'ajaxUrl'         => admin_url('admin-ajax.php'),
             'nonce'           => wp_create_nonce('shopwalk_wc_sync_all'),
             'testNonce'       => wp_create_nonce('shopwalk_wc_test_connection'),
+            'registerNonce'   => wp_create_nonce('shopwalk_auto_register'),
             'i18n'            => [
-                'syncing'    => __('Syncing...', 'shopwalk-ai'),
-                'syncNow'    => __('Sync Products Now', 'shopwalk-ai'),
-                'testing'    => __('Testing...', 'shopwalk-ai'),
-                'testConn'   => __('Test Connection', 'shopwalk-ai'),
-                'success'    => __('Sync complete!', 'shopwalk-ai'),
-                'error'      => __('Request failed. Check your Plugin Key.', 'shopwalk-ai'),
+                'syncing'        => __('Syncing...', 'shopwalk-ai'),
+                'syncNow'        => __('Sync Products Now', 'shopwalk-ai'),
+                'testing'        => __('Testing...', 'shopwalk-ai'),
+                'testConn'       => __('Test Connection', 'shopwalk-ai'),
+                'success'        => __('Sync complete!', 'shopwalk-ai'),
+                'error'          => __('Request failed. Check your Plugin Key.', 'shopwalk-ai'),
+                'connecting'     => __('Connecting your store...', 'shopwalk-ai'),
+                'connectSuccess' => __('Connected! Reloading...', 'shopwalk-ai'),
+                'connectError'   => __('Connection failed. Please try again.', 'shopwalk-ai'),
             ],
         ]);
     }

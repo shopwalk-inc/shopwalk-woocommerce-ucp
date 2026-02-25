@@ -5,6 +5,71 @@ jQuery(function ($) {
     var testBtn    = $('#shopwalk-test-connection');
     var result     = $('#shopwalk-connection-result');
 
+    /* ── AUTO-REGISTER (connect screen) ─────────────────────────────── */
+    var registerBtn    = $('#shopwalk-auto-register-btn');
+    var registerStatus = $('#shopwalk-register-status');
+
+    if (registerBtn.length) {
+        registerBtn.on('click', function () {
+            registerBtn.prop('disabled', true).text(shopwalkWC.i18n.connecting || 'Connecting your store...');
+            registerStatus.show().text('');
+
+            $.post(shopwalkWC.ajaxUrl, {
+                action: 'shopwalk_auto_register',
+                nonce:  registerBtn.data('nonce') || shopwalkWC.registerNonce,
+            })
+            .done(function (res) {
+                if (res.success) {
+                    registerStatus
+                        .css('color', '#46b450')
+                        .text('✓ ' + (res.data.message || shopwalkWC.i18n.connectSuccess));
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                } else {
+                    registerStatus
+                        .css('color', '#dc3232')
+                        .text('✗ ' + (res.data && res.data.message ? res.data.message : shopwalkWC.i18n.connectError));
+                    registerBtn.prop('disabled', false).text('Connect to Shopwalk AI — it\'s free');
+                }
+            })
+            .fail(function () {
+                registerStatus.css('color', '#dc3232').text('✗ ' + (shopwalkWC.i18n.connectError || 'Connection failed. Please try again.'));
+                registerBtn.prop('disabled', false).text('Connect to Shopwalk AI — it\'s free');
+            });
+        });
+    }
+
+    /* ── SHOW / HIDE MANUAL KEY FORM ────────────────────────────────── */
+    $('#shopwalk-show-manual-key').on('click', function (e) {
+        e.preventDefault();
+        $('#shopwalk-manual-key-form').slideToggle(200);
+    });
+
+    /* ── MANUAL KEY SAVE ─────────────────────────────────────────────── */
+    $('#shopwalk-manual-key-save').on('click', function () {
+        var key = $('#shopwalk-manual-key-input').val().trim();
+        if (!key) return;
+
+        $(this).prop('disabled', true).text('Saving...');
+
+        $.post(shopwalkWC.ajaxUrl, {
+            action:    'shopwalk_save_manual_key',
+            nonce:     shopwalkWC.registerNonce,
+            plugin_key: key,
+        })
+        .done(function (res) {
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert(res.data && res.data.message ? res.data.message : 'Failed to save key.');
+                $('#shopwalk-manual-key-save').prop('disabled', false).text('Save Key');
+            }
+        })
+        .fail(function () {
+            alert('Request failed. Please try again.');
+            $('#shopwalk-manual-key-save').prop('disabled', false).text('Save Key');
+        });
+    });
+
     /* ── STATUS DOT COLORS ───────────────────────────────────────────── */
     var COLOR_MAP = {
         green:  '#46b450',
