@@ -139,14 +139,23 @@ class Shopwalk_WC_Checkout {
         foreach ($line_items as $li) {
             $product_id = isset($li['item']['id']) ? absint($li['item']['id']) : null;
             $variant_id = isset($li['item']['variant_id']) ? absint($li['item']['variant_id']) : null;
+            $attributes = isset($li['item']['attributes']) && is_array($li['item']['attributes']) ? $li['item']['attributes'] : [];
             $quantity   = isset($li['quantity']) ? max(1, absint($li['quantity'])) : 1;
 
-            // If variant_id provided, use variation product
+            $product = null;
+
             if ($variant_id) {
+                // Explicit variant ID provided
                 $product = wc_get_product($variant_id);
-                // Verify this variation belongs to the parent product
-                if ($product && $product->get_parent_id() != $product_id) {
-                    $product = null; // Mismatch — reject
+                if ($product && $product_id && $product->get_parent_id() != $product_id) {
+                    $product = null; // Parent mismatch — reject
+                }
+            } elseif (!empty($attributes) && $product_id) {
+                // Attribute-based variant resolution
+                $product = $this->find_variation_by_attributes($product_id, $attributes);
+                if (!$product) {
+                    // Fallback to parent product if no variation matched
+                    $product = wc_get_product($product_id);
                 }
             } else {
                 $product = wc_get_product($product_id);
@@ -549,6 +558,71 @@ class Shopwalk_WC_Checkout {
     // Helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * Find a WC_Product_Variation matching the given attributes on a variable product.
+     *
+     * @param  int   $parent_id  The variable product ID.
+     * @param  array $attributes Associative array of attribute name => value (e.g. ['color' => 'red']).
+     * @return WC_Product_Variation|null  Matched variation, or null if not found.
+     */
+    private function find_variation_by_attributes(int $parent_id, array $attributes): ?WC_Product_Variation {
+        $parent = wc_get_product($parent_id);
+        if (!$parent || !$parent->is_type('variable')) {
+            return null;
+        }
+
+        // Normalize attribute keys: lowercase, prefix with 'attribute_pa_' or 'attribute_' as needed
+        $normalized = [];
+        foreach ($attributes as $key => $value) {
+            $key = strtolower(sanitize_title($key));
+            // WooCommerce stores taxonomy attributes as attribute_pa_{slug}, custom as attribute_{slug}
+            if (!str_starts_with($key, 'attribute_')) {
+                // Try taxonomy first
+                $tax_key    = 'attribute_pa_' . $key;
+                $custom_key = 'attribute_' . $key;
+                $normalized[$tax_key]    = sanitize_title($value);
+                $normalized[$custom_key] = sanitize_text_field($value);
+            } else {
+                $normalized[$key] = sanitize_text_field($value);
+            }
+        }
+
+        // Get all variation IDs for this parent
+        $variation_ids = $parent->get_children();
+        foreach ($variation_ids as $variation_id) {
+            $variation = wc_get_product($variation_id);
+            if (!$variation || !$variation instanceof WC_Product_Variation) {
+                continue;
+            }
+
+            $variation_attrs = $variation->get_variation_attributes(); // returns ['attribute_pa_color' => 'red', ...]
+            $match           = true;
+
+            foreach ($attributes as $attr_key => $attr_value) {
+                $slug_key   = 'attribute_pa_' . strtolower(sanitize_title($attr_key));
+                $custom_key = 'attribute_' . strtolower(sanitize_title($attr_key));
+
+                $variation_value = $variation_attrs[$slug_key] ?? $variation_attrs[$custom_key] ?? null;
+
+                // Empty string means "any" in WooCommerce
+                if ($variation_value === '') {
+                    continue;
+                }
+
+                if ($variation_value === null || strtolower(sanitize_title($attr_value)) !== strtolower(sanitize_title($variation_value))) {
+                    $match = false;
+                    break;
+                }
+            }
+
+            if ($match) {
+                return $variation;
+            }
+        }
+
+        return null;
+    }
+
     private function find_order_by_session_id(string $session_id): ?WC_Order {
         // Session ID format: sw_{order_id}
         $order_id = (int) str_replace('sw_', '', $session_id);
@@ -637,6 +711,9 @@ class Shopwalk_WC_Checkout {
                 'item'     => [
                     'id'         => (string) ($product ? $product->get_parent_id() ?: $product->get_id() : 0),
                     'variant_id' => ($product && $product->get_type() === 'variation') ? (string) $product->get_id() : null,
+                    'attributes' => ($product && $product->get_type() === 'variation')
+                        ? array_map('sanitize_text_field', $product->get_variation_attributes())
+                        : null,
                     'title'      => $item->get_name(),
                     'price'      => (int) round($item->get_subtotal() / max($item->get_quantity(), 1) * 100),
                 ],

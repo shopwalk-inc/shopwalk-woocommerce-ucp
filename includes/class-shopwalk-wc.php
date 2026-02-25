@@ -47,9 +47,10 @@ class Shopwalk_WC {
         add_filter('query_vars', [$this, 'add_query_vars']);
         add_action('template_redirect', [$this, 'handle_well_known']);
 
-        // Admin settings
+        // Admin settings + dashboard widget
         if (is_admin()) {
             Shopwalk_WC_Settings::instance();
+            Shopwalk_WC_Dashboard::instance();
         }
 
         // Auto-updater (checks shopwalk.com for plugin updates)

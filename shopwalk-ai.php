@@ -105,6 +105,7 @@ function shopwalk_ai_init(): void {
     require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-auth.php';
     require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-sync.php';
     require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-updater.php';
+    require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-dashboard.php';
 
     // Boot
     Shopwalk_WC::instance();
