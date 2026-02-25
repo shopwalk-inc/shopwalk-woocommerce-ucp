@@ -3,7 +3,7 @@
  * Plugin Name: Shopwalk AI
  * Plugin URI:  https://shopwalk.com/woocommerce
  * Description: AI-enable your WooCommerce store in minutes. Shopwalk AI syncs your products and opens your store to AI-powered discovery, browsing, and checkout.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      Shopwalk, Inc.
  * Author URI:  https://shopwalk.com
  * Requires Plugins: woocommerce
@@ -33,9 +33,21 @@
 
 defined('ABSPATH') || exit;
 
-define('SHOPWALK_AI_VERSION',    '1.0.0');
+define('SHOPWALK_AI_VERSION',    '1.1.0');
 define('SHOPWALK_AI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SHOPWALK_AI_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+// UCP Standardized Error Codes
+define('SHOPWALK_ERR_OUT_OF_STOCK',      'OUT_OF_STOCK');
+define('SHOPWALK_ERR_INVALID_COUPON',    'INVALID_COUPON');
+define('SHOPWALK_ERR_INVALID_SHIPPING',  'INVALID_SHIPPING');
+define('SHOPWALK_ERR_PAYMENT_FAILED',    'PAYMENT_FAILED');
+define('SHOPWALK_ERR_SESSION_NOT_FOUND', 'SESSION_NOT_FOUND');
+define('SHOPWALK_ERR_SESSION_EXPIRED',   'SESSION_EXPIRED');
+define('SHOPWALK_ERR_INVALID_ADDRESS',   'INVALID_ADDRESS');
+
+// Session expiry: 24 hours in seconds
+define('SHOPWALK_SESSION_TTL', 86400);
 
 /**
  * Declare WooCommerce HPOS (High-Performance Order Storage) compatibility.
