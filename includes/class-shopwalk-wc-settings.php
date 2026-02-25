@@ -240,8 +240,8 @@ class Shopwalk_WC_Settings {
     }
 
     /**
-     * AJAX: sync all published products to Shopwalk.
-     * Returns JSON {synced, failed, total}.
+     * AJAX: schedule a background WP-Cron job to sync all published products.
+     * Returns JSON {scheduled, message}.
      */
     public function ajax_sync_all(): void {
         check_ajax_referer('shopwalk_wc_sync_all', 'nonce');
@@ -259,47 +259,18 @@ class Shopwalk_WC_Settings {
             wp_send_json_error(['message' => 'Product sync is disabled in settings. Enable "Sync products to Shopwalk" and try again.'], 400);
         }
 
-        $product_ids = wc_get_products([
-            'status' => 'publish',
-            'limit'  => -1,
-            'return' => 'ids',
-        ]);
-
-        $total  = count($product_ids);
-        $synced = 0;
-        $failed = 0;
-        $sync   = Shopwalk_WC_Sync::instance();
-
-        foreach ($product_ids as $id) {
-            try {
-                $sync->sync_product($id);
-                $synced++;
-            } catch (\Exception $e) {
-                $failed++;
-            }
-        }
-
-        $status = get_option('shopwalk_wc_sync_status', '');
-        if ($status !== 'OK') {
-            wp_send_json_error([
-                'message' => 'Sync completed but API returned an error: ' . $status,
-                'total'   => $total,
-                'synced'  => $synced,
-                'failed'  => $failed,
-            ]);
-        }
+        // Schedule a single WP-Cron event to run the bulk sync in the background
+        wp_schedule_single_event(time(), 'shopwalk_wc_bulk_sync');
 
         wp_send_json_success([
-            'message' => sprintf('%d of %d products synced successfully.', $synced, $total),
-            'total'   => $total,
-            'synced'  => $synced,
-            'failed'  => $failed,
-            'last'    => get_option('shopwalk_wc_last_sync', ''),
+            'scheduled' => true,
+            'message'   => 'Bulk sync queued — results will appear shortly.',
         ]);
     }
 
     /**
      * AJAX: re-run all AI Commerce Status checks and return JSON.
+     * Also includes a recent bulk sync result if one is available (< 10 min old).
      */
     public function ajax_test_connection(): void {
         check_ajax_referer('shopwalk_wc_test_connection', 'nonce');
@@ -308,7 +279,18 @@ class Shopwalk_WC_Settings {
             wp_send_json_error(['message' => 'Insufficient permissions.'], 403);
         }
 
-        wp_send_json_success($this->run_status_checks());
+        $result = $this->run_status_checks();
+
+        // Attach the most-recent bulk sync result if it is less than 10 minutes old
+        $bulk_result = get_option('shopwalk_wc_bulk_sync_result', []);
+        if (!empty($bulk_result['at'])) {
+            $synced_at = strtotime($bulk_result['at']);
+            if ($synced_at && (time() - $synced_at) < 600) {
+                $result['bulk_sync'] = $bulk_result;
+            }
+        }
+
+        wp_send_json_success($result);
     }
 
     /**
@@ -500,6 +482,15 @@ class Shopwalk_WC_Settings {
                 'default'     => '',
                 'desc_tip'    => true,
                 'placeholder' => 'sw_plugin_...',
+            ],
+            'merchant_id' => [
+                'name'        => __('Merchant ID', 'shopwalk-ai'),
+                'type'        => 'text',
+                'desc'        => __('Override the merchant slug sent to Shopwalk. Leave blank to auto-derive from your site URL. Useful if the auto-derived ID does not match your Shopwalk dashboard.', 'shopwalk-ai'),
+                'id'          => 'shopwalk_wc_merchant_id',
+                'default'     => '',
+                'desc_tip'    => true,
+                'placeholder' => __('Auto (derived from site URL)', 'shopwalk-ai'),
             ],
             'api_key' => [
                 'name'     => __('Inbound API Key', 'shopwalk-ai'),

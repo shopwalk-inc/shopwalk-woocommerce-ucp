@@ -276,38 +276,41 @@ class Shopwalk_WC_Checkout {
         if (array_key_exists('promotions', $body)) {
             $promotions = $body['promotions'];
 
-            // Remove all existing coupons first
+            // Remove all existing coupons from the order
             foreach ($order->get_coupon_codes() as $existing_code) {
                 $order->remove_coupon($existing_code);
             }
+            $order->update_meta_data('_shopwalk_coupon_codes', '');
 
-            // Apply new promotions (if any)
             if (!empty($promotions) && is_array($promotions)) {
+                $valid_codes = [];
+
+                // 1. Validate each coupon before touching the order
                 foreach ($promotions as $promo) {
                     $code = isset($promo['code']) ? sanitize_text_field(strtolower(trim($promo['code']))) : '';
                     if (empty($code)) {
                         continue;
                     }
 
-                    $result = $order->apply_coupon($code);
-
-                    if (is_wp_error($result)) {
-                        $messages[] = [
-                            'type'     => 'error',
-                            'code'     => SHOPWALK_ERR_INVALID_COUPON,
-                            'content'  => sprintf('Coupon "%s" is invalid: %s', $code, $result->get_error_message()),
-                            'severity' => 'error',
-                        ];
-                    } elseif ($result === false) {
-                        $messages[] = [
-                            'type'     => 'error',
-                            'code'     => SHOPWALK_ERR_INVALID_COUPON,
-                            'content'  => sprintf('Coupon "%s" could not be applied.', $code),
-                            'severity' => 'error',
-                        ];
+                    $coupon = new WC_Coupon($code);
+                    if (!$coupon->is_valid()) {
+                        return $this->ucp_error(
+                            SHOPWALK_ERR_INVALID_COUPON,
+                            sprintf('Coupon %s is not valid.', $code),
+                            400
+                        );
                     }
-                    // Success — WC already added the coupon to the order
+
+                    $valid_codes[] = $code;
                 }
+
+                // 2. All coupons validated — apply to the order for totals display
+                foreach ($valid_codes as $code) {
+                    $order->apply_coupon($code);
+                }
+
+                // 3. Persist validated codes in session meta for complete_session()
+                $order->update_meta_data('_shopwalk_coupon_codes', wp_json_encode($valid_codes));
             }
         }
 
@@ -340,6 +343,22 @@ class Shopwalk_WC_Checkout {
 
         // Ensure a guest email is present even if store requires accounts
         $this->ensure_guest_customer($order);
+
+        // Re-apply any coupons stored in session meta (set during update_session).
+        // This ensures coupons are active on the final order even if the order was
+        // reloaded from the database without coupon data in memory.
+        $stored_coupon_json = $order->get_meta('_shopwalk_coupon_codes');
+        if (!empty($stored_coupon_json)) {
+            $stored_codes = json_decode($stored_coupon_json, true);
+            if (is_array($stored_codes)) {
+                $applied = $order->get_coupon_codes();
+                foreach ($stored_codes as $code) {
+                    if (!in_array($code, $applied, true)) {
+                        $order->apply_coupon($code);
+                    }
+                }
+            }
+        }
 
         // Validate required fields
         $messages = [];
