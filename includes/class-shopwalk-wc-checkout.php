@@ -26,7 +26,7 @@ class Shopwalk_WC_Checkout {
             'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
         ]);
 
-        // Update checkout session (add buyer info, fulfillment, payment)
+        // Update checkout session (add buyer info, fulfillment, payment, promotions)
         register_rest_route($namespace, '/checkout-sessions/(?P<id>[a-zA-Z0-9_-]+)', [
             'methods'             => 'PUT',
             'callback'            => [$this, 'update_session'],
@@ -55,21 +55,83 @@ class Shopwalk_WC_Checkout {
         ]);
     }
 
+    // -------------------------------------------------------------------------
+    // UCP helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build a UCP-standardized error response.
+     */
+    private function ucp_error(string $code, string $message, int $http_status = 400): WP_REST_Response {
+        return new WP_REST_Response([
+            'error' => [
+                'code'    => $code,
+                'message' => $message,
+            ],
+        ], $http_status);
+    }
+
+    /**
+     * Check whether a session has expired (> SHOPWALK_SESSION_TTL seconds old).
+     */
+    private function is_session_expired(WC_Order $order): bool {
+        $created = (int) $order->get_meta('_shopwalk_session_created');
+        if (!$created) {
+            return false; // Legacy sessions without timestamp — allow through
+        }
+        return (time() - $created) > SHOPWALK_SESSION_TTL;
+    }
+
+    // -------------------------------------------------------------------------
+    // Guest Checkout Assurance helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Temporarily force guest checkout on for the duration of a Shopwalk session.
+     * Hooked during create_session and complete_session.
+     */
+    private function force_guest_checkout(): void {
+        add_filter('woocommerce_enable_guest_checkout',  '__return_true', 999);
+        add_filter('pre_option_woocommerce_enable_guest_checkout', function() { return 'yes'; }, 999);
+    }
+
+    /**
+     * Ensure the order has a valid customer / email for checkout.
+     * If the store requires registration but we have no email, generate a bot email.
+     */
+    private function ensure_guest_customer(WC_Order $order): void {
+        if ($order->get_billing_email()) {
+            return; // Already set — nothing to do
+        }
+
+        // Generate a deterministic bot email so the order still passes WC validation
+        $bot_email = 'shopwalk-bot+order-' . $order->get_id() . '@shopwalk.com';
+        $order->set_billing_email($bot_email);
+        $order->add_order_note('AI-initiated order. Bot email assigned for guest checkout compliance.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Endpoint handlers
+    // -------------------------------------------------------------------------
+
     /**
      * Create a new checkout session from line items.
      */
     public function create_session(WP_REST_Request $request): WP_REST_Response {
-        $body = $request->get_json_params();
+        // Force guest checkout for Shopwalk sessions
+        $this->force_guest_checkout();
+
+        $body       = $request->get_json_params();
         $line_items = $body['line_items'] ?? [];
 
         if (empty($line_items)) {
-            return new WP_REST_Response(['error' => 'line_items required'], 400);
+            return $this->ucp_error('MISSING_LINE_ITEMS', 'line_items required', 400);
         }
 
         // Create a pending WC order
         $order = wc_create_order(['status' => 'pending']);
         if (is_wp_error($order)) {
-            return new WP_REST_Response(['error' => $order->get_error_message()], 500);
+            return $this->ucp_error('ORDER_CREATE_FAILED', $order->get_error_message(), 500);
         }
 
         // Add line items
@@ -93,7 +155,7 @@ class Shopwalk_WC_Checkout {
             if (!$product) {
                 $messages[] = [
                     'type'     => 'error',
-                    'code'     => 'PRODUCT_NOT_FOUND',
+                    'code'     => SHOPWALK_ERR_OUT_OF_STOCK,
                     'content'  => "Product {$product_id} not found.",
                     'severity' => 'error',
                 ];
@@ -103,7 +165,7 @@ class Shopwalk_WC_Checkout {
             if (!$product->is_in_stock()) {
                 $messages[] = [
                     'type'     => 'warning',
-                    'code'     => 'OUT_OF_STOCK',
+                    'code'     => SHOPWALK_ERR_OUT_OF_STOCK,
                     'content'  => "{$product->get_name()} is out of stock.",
                     'severity' => 'warning',
                 ];
@@ -116,10 +178,11 @@ class Shopwalk_WC_Checkout {
         $order->calculate_totals();
         $order->save();
 
-        // Store session ID as order meta
+        // Store session metadata
         $session_id = 'sw_' . $order->get_id();
-        $order->update_meta_data('_shopwalk_session_id', $session_id);
-        $order->update_meta_data('_shopwalk_status', 'open');
+        $order->update_meta_data('_shopwalk_session_id',      $session_id);
+        $order->update_meta_data('_shopwalk_status',           'open');
+        $order->update_meta_data('_shopwalk_session_created',  (string) time()); // for expiry
         $order->save();
 
         return new WP_REST_Response($this->format_session($order, $messages), 201);
@@ -131,134 +194,201 @@ class Shopwalk_WC_Checkout {
     public function get_session(WP_REST_Request $request): WP_REST_Response {
         $order = $this->find_order_by_session_id($request->get_param('id'));
         if (!$order) {
-            return new WP_REST_Response(['error' => 'Session not found'], 404);
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_NOT_FOUND, 'Session not found', 404);
+        }
+
+        if ($this->is_session_expired($order)) {
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_EXPIRED, 'This checkout session has expired. Please start a new session.', 410);
         }
 
         return new WP_REST_Response($this->format_session($order), 200);
     }
 
     /**
-     * Update session — add buyer info, shipping address, payment, fulfillment selection.
+     * Update session — add buyer info, shipping address, payment, fulfillment selection, promotions.
      */
     public function update_session(WP_REST_Request $request): WP_REST_Response {
         $order = $this->find_order_by_session_id($request->get_param('id'));
         if (!$order) {
-            return new WP_REST_Response(['error' => 'Session not found'], 404);
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_NOT_FOUND, 'Session not found', 404);
         }
 
-        $body = $request->get_json_params();
+        if ($this->is_session_expired($order)) {
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_EXPIRED, 'This checkout session has expired. Please start a new session.', 410);
+        }
+
+        $body     = $request->get_json_params();
+        $messages = [];
 
         // Update buyer info
         if (isset($body['buyer'])) {
             $buyer = $body['buyer'];
             if (isset($buyer['email'])) {
-                $order->set_billing_email($buyer['email']);
+                $order->set_billing_email(sanitize_email($buyer['email']));
             }
             if (isset($buyer['first_name'])) {
-                $order->set_billing_first_name($buyer['first_name']);
-                $order->set_shipping_first_name($buyer['first_name']);
+                $order->set_billing_first_name(sanitize_text_field($buyer['first_name']));
+                $order->set_shipping_first_name(sanitize_text_field($buyer['first_name']));
             }
             if (isset($buyer['last_name'])) {
-                $order->set_billing_last_name($buyer['last_name']);
-                $order->set_shipping_last_name($buyer['last_name']);
+                $order->set_billing_last_name(sanitize_text_field($buyer['last_name']));
+                $order->set_shipping_last_name(sanitize_text_field($buyer['last_name']));
             }
         }
 
         // Update fulfillment / shipping address
         if (isset($body['fulfillment']['destinations'][0])) {
             $dest = $body['fulfillment']['destinations'][0];
-            $order->set_shipping_first_name($dest['first_name'] ?? '');
-            $order->set_shipping_last_name($dest['last_name'] ?? '');
-            $order->set_shipping_address_1($dest['street_address'] ?? '');
-            $order->set_shipping_city($dest['city'] ?? '');
-            $order->set_shipping_state($dest['region'] ?? '');
-            $order->set_shipping_postcode($dest['postal_code'] ?? '');
-            $order->set_shipping_country($dest['country'] ?? '');
+            $order->set_shipping_first_name(sanitize_text_field($dest['first_name'] ?? ''));
+            $order->set_shipping_last_name(sanitize_text_field($dest['last_name'] ?? ''));
+            $order->set_shipping_address_1(sanitize_text_field($dest['street_address'] ?? ''));
+            $order->set_shipping_city(sanitize_text_field($dest['city'] ?? ''));
+            $order->set_shipping_state(sanitize_text_field($dest['region'] ?? ''));
+            $order->set_shipping_postcode(sanitize_text_field($dest['postal_code'] ?? ''));
+            $order->set_shipping_country(sanitize_text_field($dest['country'] ?? ''));
 
             // Copy to billing if not set
             if (!$order->get_billing_address_1()) {
-                $order->set_billing_address_1($dest['street_address'] ?? '');
-                $order->set_billing_city($dest['city'] ?? '');
-                $order->set_billing_state($dest['region'] ?? '');
-                $order->set_billing_postcode($dest['postal_code'] ?? '');
-                $order->set_billing_country($dest['country'] ?? '');
+                $order->set_billing_address_1(sanitize_text_field($dest['street_address'] ?? ''));
+                $order->set_billing_city(sanitize_text_field($dest['city'] ?? ''));
+                $order->set_billing_state(sanitize_text_field($dest['region'] ?? ''));
+                $order->set_billing_postcode(sanitize_text_field($dest['postal_code'] ?? ''));
+                $order->set_billing_country(sanitize_text_field($dest['country'] ?? ''));
             }
         }
 
         // Update selected shipping method
         if (isset($body['fulfillment']['groups'][0]['selected_option_id'])) {
-            $shipping_id = $body['fulfillment']['groups'][0]['selected_option_id'];
+            $shipping_id = sanitize_text_field($body['fulfillment']['groups'][0]['selected_option_id']);
             $order->update_meta_data('_shopwalk_selected_shipping', $shipping_id);
         }
 
         // Update payment selection
         if (isset($body['payment']['instruments'][0])) {
             $instrument = $body['payment']['instruments'][0];
-            $order->set_payment_method($instrument['handler_id'] ?? 'stripe');
-            $order->update_meta_data('_shopwalk_payment_token', $instrument['id'] ?? '');
+            $order->set_payment_method(sanitize_key($instrument['handler_id'] ?? 'stripe'));
+            $order->update_meta_data('_shopwalk_payment_token', sanitize_text_field($instrument['id'] ?? ''));
+        }
+
+        // -----------------------------------------------------------------------
+        // Coupon / Promotion Code Support
+        // -----------------------------------------------------------------------
+        if (array_key_exists('promotions', $body)) {
+            $promotions = $body['promotions'];
+
+            // Remove all existing coupons first
+            foreach ($order->get_coupon_codes() as $existing_code) {
+                $order->remove_coupon($existing_code);
+            }
+
+            // Apply new promotions (if any)
+            if (!empty($promotions) && is_array($promotions)) {
+                foreach ($promotions as $promo) {
+                    $code = isset($promo['code']) ? sanitize_text_field(strtolower(trim($promo['code']))) : '';
+                    if (empty($code)) {
+                        continue;
+                    }
+
+                    $result = $order->apply_coupon($code);
+
+                    if (is_wp_error($result)) {
+                        $messages[] = [
+                            'type'     => 'error',
+                            'code'     => SHOPWALK_ERR_INVALID_COUPON,
+                            'content'  => sprintf('Coupon "%s" is invalid: %s', $code, $result->get_error_message()),
+                            'severity' => 'error',
+                        ];
+                    } elseif ($result === false) {
+                        $messages[] = [
+                            'type'     => 'error',
+                            'code'     => SHOPWALK_ERR_INVALID_COUPON,
+                            'content'  => sprintf('Coupon "%s" could not be applied.', $code),
+                            'severity' => 'error',
+                        ];
+                    }
+                    // Success — WC already added the coupon to the order
+                }
+            }
         }
 
         $order->calculate_totals();
         $order->save();
 
-        return new WP_REST_Response($this->format_session($order), 200);
+        return new WP_REST_Response($this->format_session($order, $messages), 200);
     }
 
     /**
      * Complete the checkout — transition to a real WC order.
      */
     public function complete_session(WP_REST_Request $request): WP_REST_Response {
+        // Force guest checkout for Shopwalk sessions
+        $this->force_guest_checkout();
+
         $order = $this->find_order_by_session_id($request->get_param('id'));
         if (!$order) {
-            return new WP_REST_Response(['error' => 'Session not found'], 404);
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_NOT_FOUND, 'Session not found', 404);
+        }
+
+        if ($this->is_session_expired($order)) {
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_EXPIRED, 'This checkout session has expired. Please start a new session.', 410);
         }
 
         $shopwalk_status = $order->get_meta('_shopwalk_status');
         if ($shopwalk_status === 'completed') {
-            return new WP_REST_Response(['error' => 'Session already completed'], 409);
+            return $this->ucp_error('SESSION_ALREADY_COMPLETED', 'Session already completed', 409);
         }
+
+        // Ensure a guest email is present even if store requires accounts
+        $this->ensure_guest_customer($order);
 
         // Validate required fields
         $messages = [];
         if (!$order->get_billing_email()) {
-            $messages[] = ['type' => 'error', 'code' => 'MISSING_EMAIL', 'content' => 'Buyer email is required.', 'severity' => 'error'];
+            $messages[] = [
+                'type'     => 'error',
+                'code'     => SHOPWALK_ERR_INVALID_ADDRESS,
+                'content'  => 'Buyer email is required.',
+                'severity' => 'error',
+            ];
         }
         if (!$order->get_shipping_address_1()) {
-            $messages[] = ['type' => 'error', 'code' => 'MISSING_ADDRESS', 'content' => 'Shipping address is required.', 'severity' => 'error'];
+            $messages[] = [
+                'type'     => 'error',
+                'code'     => SHOPWALK_ERR_INVALID_ADDRESS,
+                'content'  => 'Shipping address is required.',
+                'severity' => 'error',
+            ];
         }
 
         if (!empty($messages)) {
             return new WP_REST_Response([
-                'error'    => 'Validation failed',
+                'error' => [
+                    'code'     => SHOPWALK_ERR_INVALID_ADDRESS,
+                    'message'  => 'Validation failed',
+                ],
                 'messages' => $messages,
             ], 422);
         }
 
         // Process payment
-        $body = $request->get_json_params();
+        $body            = $request->get_json_params();
+        $payment_mandate = $body['payment_mandate'] ?? [];
+        $handler_id      = sanitize_key($payment_mandate['handler_id'] ?? '');
+        $payment_token   = sanitize_text_field($payment_mandate['token'] ?? '');
+
         if (isset($body['payment_mandate'])) {
             $order->update_meta_data('_shopwalk_payment_mandate', wp_json_encode($body['payment_mandate']));
         }
 
-        $payment_mandate = $body['payment_mandate'] ?? [];
-        $handler_id      = $payment_mandate['handler_id'] ?? '';
-        $payment_token   = $payment_mandate['token'] ?? '';
-
         if ($handler_id === 'stripe' && !empty($payment_token) && class_exists('WC_Stripe_Helper')) {
-            // Process via Stripe gateway
             $result = $this->charge_stripe($order, $payment_token);
             if (is_wp_error($result)) {
-                return new WP_REST_Response([
-                    'error' => 'Payment failed: ' . $result->get_error_message(),
-                    'code'  => 'PAYMENT_FAILED',
-                ], 402);
+                return $this->ucp_error(SHOPWALK_ERR_PAYMENT_FAILED, 'Payment failed: ' . $result->get_error_message(), 402);
             }
         } elseif ($handler_id === 'cod' || empty($handler_id)) {
-            // Cash on delivery or no payment — accept as-is
             $order->set_payment_method('cod');
             $order->set_payment_method_title('Pay on Delivery');
         } else {
-            // Unknown handler — still accept but flag it
             $order->set_payment_method($handler_id);
         }
 
@@ -296,7 +426,7 @@ class Shopwalk_WC_Checkout {
     public function cancel_session(WP_REST_Request $request): WP_REST_Response {
         $order = $this->find_order_by_session_id($request->get_param('id'));
         if (!$order) {
-            return new WP_REST_Response(['error' => 'Session not found'], 404);
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_NOT_FOUND, 'Session not found', 404);
         }
 
         $order->set_status('cancelled');
@@ -312,7 +442,11 @@ class Shopwalk_WC_Checkout {
     public function get_shipping_options(WP_REST_Request $request): WP_REST_Response {
         $order = $this->find_order_by_session_id($request->get_param('id'));
         if (!$order) {
-            return new WP_REST_Response(['error' => 'Session not found'], 404);
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_NOT_FOUND, 'Session not found', 404);
+        }
+
+        if ($this->is_session_expired($order)) {
+            return $this->ucp_error(SHOPWALK_ERR_SESSION_EXPIRED, 'This checkout session has expired.', 410);
         }
 
         // Build a package for WC shipping calculation
@@ -365,7 +499,9 @@ class Shopwalk_WC_Checkout {
         ], 200);
     }
 
-    // --- Helpers ---
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
     private function find_order_by_session_id(string $session_id): ?WC_Order {
         // Session ID format: sw_{order_id}
@@ -398,6 +534,12 @@ class Shopwalk_WC_Checkout {
             'line_items' => $this->format_line_items($order),
             'totals'     => $this->format_totals($order),
         ];
+
+        // Applied promotions (coupons)
+        $coupon_codes = $order->get_coupon_codes();
+        if (!empty($coupon_codes)) {
+            $session['promotions'] = array_map(fn($code) => ['code' => $code], $coupon_codes);
+        }
 
         // Buyer
         if ($order->get_billing_email()) {
@@ -480,9 +622,8 @@ class Shopwalk_WC_Checkout {
      * @return true|WP_Error
      */
     private function charge_stripe(WC_Order $order, string $payment_method_id): true|WP_Error {
-        // Use Stripe PHP SDK if WooCommerce Stripe plugin is active
         if (!class_exists('WC_Stripe_API')) {
-            // Fallback: just set payment method and proceed (gateway will handle on order creation)
+            // Fallback: set meta and let gateway handle on order creation
             $order->set_payment_method('stripe');
             $order->update_meta_data('_stripe_source_id', $payment_method_id);
             $order->update_meta_data('_payment_method_id', $payment_method_id);
@@ -490,7 +631,7 @@ class Shopwalk_WC_Checkout {
         }
 
         try {
-            $amount   = (int) round($order->get_total() * 100); // cents
+            $amount   = (int) round($order->get_total() * 100);
             $currency = strtolower($order->get_currency());
 
             $intent = WC_Stripe_API::request([
@@ -499,7 +640,7 @@ class Shopwalk_WC_Checkout {
                 'payment_method'      => $payment_method_id,
                 'confirmation_method' => 'automatic',
                 'confirm'             => 'true',
-                'description'        => 'Shopwalk order #' . $order->get_id(),
+                'description'         => 'Shopwalk order #' . $order->get_id(),
             ], 'payment_intents');
 
             if (!empty($intent->error)) {
