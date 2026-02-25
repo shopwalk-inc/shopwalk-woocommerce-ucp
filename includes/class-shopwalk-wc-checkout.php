@@ -399,7 +399,34 @@ class Shopwalk_WC_Checkout {
             $order->update_meta_data('_shopwalk_payment_mandate', wp_json_encode($body['payment_mandate']));
         }
 
-        if ($handler_id === 'stripe' && !empty($payment_token) && class_exists('WC_Stripe_Helper')) {
+        if ($handler_id === 'stripe' && !empty($payment_token) && str_starts_with($payment_token, 'pm_')) {
+            // Use the bundled Stripe SDK to charge the PaymentMethod directly
+            $stripe_result = $this->charge_stripe_payment(
+                $payment_token,
+                (float) $order->get_total(),
+                $order->get_currency(),
+                $order
+            );
+
+            if (!$stripe_result['success']) {
+                $order->update_status('failed');
+                $order->add_order_note('Shopwalk AI — Stripe charge failed: ' . ($stripe_result['error'] ?? 'Unknown error'));
+                $order->save();
+                return $this->ucp_error(
+                    SHOPWALK_ERR_PAYMENT_FAILED,
+                    'Payment failed: ' . ($stripe_result['error'] ?? 'Unknown error'),
+                    402
+                );
+            }
+
+            // Success — record the PaymentIntent and set gateway
+            $order->set_payment_method('stripe');
+            $order->set_payment_method_title('Stripe (Shopwalk AI)');
+            $order->update_meta_data('_shopwalk_stripe_payment_intent', $stripe_result['payment_intent_id']);
+            $order->add_order_note('Shopwalk AI — Stripe PaymentIntent: ' . $stripe_result['payment_intent_id']);
+
+        } elseif ($handler_id === 'stripe' && !empty($payment_token) && class_exists('WC_Stripe_Helper')) {
+            // Legacy path: WC Stripe gateway handles the charge
             $result = $this->charge_stripe($order, $payment_token);
             if (is_wp_error($result)) {
                 return $this->ucp_error(SHOPWALK_ERR_PAYMENT_FAILED, 'Payment failed: ' . $result->get_error_message(), 402);
@@ -631,6 +658,85 @@ class Shopwalk_WC_Checkout {
             ['type' => 'discount', 'amount' => (int) round((float) $order->get_discount_total() * 100)],
             ['type' => 'total',    'amount' => (int) round((float) $order->get_total() * 100)],
         ];
+    }
+
+    /**
+     * Charge a Stripe PaymentMethod (pm_xxx) via the Stripe PHP SDK.
+     *
+     * Key resolution order:
+     *  1. WC Stripe gateway settings (woocommerce_stripe_settings, respects testmode)
+     *  2. shopwalk_wc_stripe_secret_key plugin option (manual override)
+     *
+     * @param  string    $token    Stripe PaymentMethod ID (pm_xxx)
+     * @param  float     $amount   Order total in store currency
+     * @param  string    $currency ISO 4217 currency code
+     * @param  WC_Order  $order    WC order for metadata
+     * @return array{success: bool, payment_intent_id?: string, error?: string}
+     */
+    private function charge_stripe_payment(string $token, float $amount, string $currency, WC_Order $order): array {
+        // -- 1. Resolve secret key ------------------------------------------------
+        $secret_key = '';
+
+        // Try WC Stripe gateway settings first
+        $wc_stripe_settings = get_option('woocommerce_stripe_settings', []);
+        if (!empty($wc_stripe_settings)) {
+            $testmode = ($wc_stripe_settings['testmode'] ?? 'no') === 'yes';
+            if ($testmode) {
+                $secret_key = $wc_stripe_settings['test_secret_key'] ?? '';
+            } else {
+                $secret_key = $wc_stripe_settings['secret_key'] ?? '';
+            }
+        }
+
+        // Fallback to plugin-specific option
+        if (empty($secret_key)) {
+            $secret_key = get_option('shopwalk_wc_stripe_secret_key', '');
+        }
+
+        if (empty($secret_key)) {
+            return ['success' => false, 'error' => 'Stripe secret key is not configured.'];
+        }
+
+        // -- 2. Load Stripe SDK ---------------------------------------------------
+        $autoload = SHOPWALK_AI_PLUGIN_DIR . 'vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            return ['success' => false, 'error' => 'Stripe SDK vendor/autoload.php not found.'];
+        }
+        require_once $autoload;
+
+        // -- 3. Create PaymentIntent ---------------------------------------------
+        try {
+            \Stripe\Stripe::setApiKey($secret_key);
+
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'                 => (int) round($amount * 100),
+                'currency'               => strtolower($currency),
+                'payment_method'         => $token,
+                'confirm'                => true,
+                'automatic_payment_methods' => [
+                    'enabled'         => true,
+                    'allow_redirects' => 'never',
+                ],
+                'metadata' => [
+                    'order_id' => $order->get_id(),
+                    'source'   => 'shopwalk_ai',
+                ],
+            ]);
+
+            if ($intent->status === 'succeeded') {
+                return ['success' => true, 'payment_intent_id' => $intent->id];
+            }
+
+            return [
+                'success' => false,
+                'error'   => 'PaymentIntent status: ' . $intent->status,
+            ];
+
+        } catch (\Stripe\Exception\CardException $e) {
+            return ['success' => false, 'error' => 'Card declined: ' . $e->getMessage()];
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return ['success' => false, 'error' => 'Stripe API error: ' . $e->getMessage()];
+        }
     }
 
     /**

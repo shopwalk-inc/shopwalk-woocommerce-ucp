@@ -1,0 +1,41 @@
+<?php return array(
+    'root' => array(
+        'name' => 'shopwalk-inc/shopwalk-ai',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '9a965c9121659dcb9b9e51aab11d9ea7ca6f3180',
+        'type' => 'library',
+        'install_path' => __DIR__ . '/../../',
+        'aliases' => array(),
+        'dev' => true,
+    ),
+    'versions' => array(
+        'shopwalk-inc/shopwalk-ai' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '9a965c9121659dcb9b9e51aab11d9ea7ca6f3180',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'stripe/stripe-php' => array(
+            'pretty_version' => 'v13.18.0',
+            'version' => '13.18.0.0',
+            'reference' => '02abb043b103766f4ed920642ae56ffdc58c7467',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../stripe/stripe-php',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'woocommerce/qit-cli' => array(
+            'pretty_version' => '0.7.1',
+            'version' => '0.7.1.0',
+            'reference' => '124a4fc100d0eb1486622ab3e2ffb24c31f5ba9b',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../woocommerce/qit-cli',
+            'aliases' => array(),
+            'dev_requirement' => true,
+        ),
+    ),
+);
