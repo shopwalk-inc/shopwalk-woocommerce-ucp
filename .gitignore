@@ -1,0 +1,17 @@
+# Build artifacts
+*.zip
+*.tar.gz
+
+# Vendor — installed via composer install; built into release zip via CI
+vendor/
+
+# OS / IDE
+.DS_Store
+.idea/
+*.log
+node_modules/
+
+# Dev tools
+.env
+.env.*
+shopwalk-ai.zip
