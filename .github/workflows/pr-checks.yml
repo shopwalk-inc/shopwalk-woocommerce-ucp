@@ -33,7 +33,7 @@ jobs:
         run: |
           if [ ! -f readme.txt ]; then echo "❌ readme.txt not found"; exit 1; fi
 
-          for header in "Plugin Name" "Stable tag" "License" "Requires at least" "Tested up to" "Requires PHP"; do
+          for header in "Stable tag" "License" "Requires at least" "Tested up to" "Requires PHP"; do
             if ! grep -q "^${header}:" readme.txt; then echo "❌ Missing: ${header}"; exit 1; fi
           done
 

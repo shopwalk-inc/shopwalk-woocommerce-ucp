@@ -823,7 +823,7 @@ class Shopwalk_WC_Checkout {
      * @param string   $payment_method_id  Stripe PaymentMethod ID (pm_xxx)
      * @return true|WP_Error
      */
-    private function charge_stripe(WC_Order $order, string $payment_method_id): true|WP_Error {
+    private function charge_stripe(WC_Order $order, string $payment_method_id): bool|WP_Error {
         if (!class_exists('WC_Stripe_API')) {
             // Fallback: set meta and let gateway handle on order creation
             $order->set_payment_method('stripe');
