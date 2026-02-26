@@ -123,7 +123,7 @@ class Shopwalk_WC {
         $profile = Shopwalk_WC_Profile::get_business_profile();
 
         header('Content-Type: application/json; charset=utf-8');
-        header('Cache-Control: public, max-age=3600');
+        header('Cache-Control: public, max-age=60');
         header('Access-Control-Allow-Origin: *');
         echo wp_json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;

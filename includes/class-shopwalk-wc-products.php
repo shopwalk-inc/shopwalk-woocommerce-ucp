@@ -94,40 +94,38 @@ class Shopwalk_WC_Products {
             $args['stock_status'] = $in_stock ? 'instock' : 'outofstock';
         }
 
-        // price range filter — uses WP_Query meta query under the hood
-        if ($min_price !== null || $max_price !== null) {
-            $meta_query = [];
-            if ($min_price !== null) {
-                $meta_query[] = [
-                    'key'     => '_price',
-                    'value'   => (float) $min_price,
-                    'compare' => '>=',
-                    'type'    => 'NUMERIC',
-                ];
-            }
-            if ($max_price !== null) {
-                $meta_query[] = [
-                    'key'     => '_price',
-                    'value'   => (float) $max_price,
-                    'compare' => '<=',
-                    'type'    => 'NUMERIC',
-                ];
-            }
-            if (count($meta_query) > 1) {
-                $meta_query['relation'] = 'AND';
-            }
-            $args['meta_query'] = $meta_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-        }
+        // price range filter — WC_Product_Query doesn't reliably pass meta_query,
+        // so we fetch all and post-filter by price in PHP.
+        $needs_price_filter = ($min_price !== null || $max_price !== null);
 
         $query    = new WC_Product_Query($args);
         $products = $query->get_products();
 
-        // Get total count for pagination
+        // Post-filter by price if needed
+        if ($needs_price_filter) {
+            $products = array_values(array_filter($products, function ($p) use ($min_price, $max_price) {
+                $price = (float) $p->get_price();
+                if ($min_price !== null && $price < (float) $min_price) return false;
+                if ($max_price !== null && $price > (float) $max_price) return false;
+                return true;
+            }));
+        }
+
+        // Get total count for pagination — re-run without paging for accurate total
         $count_args           = $args;
         $count_args['limit']  = -1;
-        $count_args['return'] = 'ids';
+        $count_args['return'] = 'objects';
         unset($count_args['page']);
-        $total = count((new WC_Product_Query($count_args))->get_products());
+        $all_for_count = (new WC_Product_Query($count_args))->get_products();
+        if ($needs_price_filter) {
+            $all_for_count = array_filter($all_for_count, function ($p) use ($min_price, $max_price) {
+                $price = (float) $p->get_price();
+                if ($min_price !== null && $price < (float) $min_price) return false;
+                if ($max_price !== null && $price > (float) $max_price) return false;
+                return true;
+            });
+        }
+        $total = count($all_for_count);
 
         $items = array_map([$this, 'format_product'], $products);
 
@@ -224,7 +222,7 @@ class Shopwalk_WC_Products {
     public function list_categories(WP_REST_Request $request): WP_REST_Response {
         $terms = get_terms([
             'taxonomy'   => 'product_cat',
-            'hide_empty' => true,
+            'hide_empty' => false,
             'orderby'    => 'name',
         ]);
 
