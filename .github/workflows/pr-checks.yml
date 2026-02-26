@@ -7,25 +7,30 @@ on:
     branches: [main]
 
 jobs:
-  # ─── PHP Syntax Check ───────────────────────────────────────────────────────
-  # Uses only GitHub-owned actions (org policy: local_only)
   php-syntax:
     name: PHP Syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        run: |
+          git clone "https://github.com/${{ github.repository }}.git" .
+          git fetch origin ${{ github.ref }}
+          git checkout FETCH_HEAD
 
-      - name: Check PHP syntax (PHP 8.x bundled on ubuntu-latest)
+      - name: Check PHP syntax
         run: find . -name "*.php" -not -path "./vendor/*" | xargs -I {} php -l {}
 
-  # ─── Validate readme.txt ────────────────────────────────────────────────────
   readme-check:
     name: Validate readme.txt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        run: |
+          git clone "https://github.com/${{ github.repository }}.git" .
+          git fetch origin ${{ github.ref }}
+          git checkout FETCH_HEAD
 
-      - name: Check readme.txt headers and version sync
+      - name: Validate readme.txt headers and version sync
         run: |
           if [ ! -f readme.txt ]; then
             echo "❌ readme.txt not found"
@@ -43,8 +48,8 @@ jobs:
           VERSION=$(grep "define('SHOPWALK_AI_VERSION'" shopwalk-ai.php | grep -o "'[0-9.]*'" | tr -d "'")
 
           if [ "$STABLE" != "$VERSION" ]; then
-            echo "❌ Stable tag ($STABLE) does not match plugin version ($VERSION)"
+            echo "❌ Stable tag ($STABLE) != plugin version ($VERSION)"
             exit 1
           fi
 
-          echo "✅ readme.txt valid (stable tag: $STABLE)"
+          echo "✅ readme.txt valid — stable tag: $STABLE"
