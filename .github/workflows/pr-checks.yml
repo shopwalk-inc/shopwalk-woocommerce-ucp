@@ -1,0 +1,47 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  php-syntax:
+    name: PHP Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PHP syntax
+        run: find . -name "*.php" -not -path "./vendor/*" | xargs -I {} php -l {}
+
+  readme-check:
+    name: Validate readme.txt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate readme.txt headers and version sync
+        run: |
+          if [ ! -f readme.txt ]; then
+            echo "❌ readme.txt not found"
+            exit 1
+          fi
+
+          for header in "Plugin Name" "Stable tag" "License" "Requires at least" "Tested up to" "Requires PHP"; do
+            if ! grep -q "^${header}:" readme.txt; then
+              echo "❌ Missing required header: ${header}"
+              exit 1
+            fi
+          done
+
+          STABLE=$(grep "^Stable tag:" readme.txt | sed 's/Stable tag: //' | tr -d '[:space:]')
+          VERSION=$(grep "define('SHOPWALK_AI_VERSION'" shopwalk-ai.php | grep -o "'[0-9.]*'" | tr -d "'")
+
+          if [ "$STABLE" != "$VERSION" ]; then
+            echo "❌ Stable tag ($STABLE) != plugin version ($VERSION)"
+            exit 1
+          fi
+
+          echo "✅ readme.txt valid — stable tag: $STABLE"
