@@ -4,7 +4,7 @@
     "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=8.0",
-        "stripe/stripe-php": "^13.0"
+        "stripe/stripe-php": "^19.4"
     },
     "require-dev": {
         "woocommerce/qit-cli": "^0.7"
