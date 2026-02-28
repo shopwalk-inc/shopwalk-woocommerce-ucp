@@ -51,6 +51,16 @@ class Shopwalk_WC_Products {
             'callback'            => [$this, 'list_categories'],
             'permission_callback' => [Shopwalk_WC_Auth::class, 'check_public_permission'],
         ]);
+
+        // Product reviews (protected — requires Inbound API Key)
+        register_rest_route($namespace, '/reviews', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'get_reviews'],
+            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
+            'args'                => [
+                'product_id' => ['type' => 'integer', 'required' => true, 'minimum' => 1],
+            ],
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -245,6 +255,45 @@ class Shopwalk_WC_Products {
         return new WP_REST_Response(['items' => $categories], 200);
     }
 
+    /**
+     * Reviews Endpoint.
+     * Returns the most recent approved reviews for a given product.
+     * Protected by Inbound API Key (Authorization: Bearer <key>).
+     */
+    public function get_reviews(WP_REST_Request $request): WP_REST_Response|WP_Error {
+        $product_id = intval($request->get_param('product_id'));
+        if (!$product_id) {
+            return new WP_Error('missing_param', 'product_id required', ['status' => 400]);
+        }
+
+        $reviews = get_comments([
+            'post_id' => $product_id,
+            'status'  => 'approve',
+            'type'    => 'review',
+            'number'  => 10,
+            'orderby' => 'comment_date',
+            'order'   => 'DESC',
+        ]);
+
+        $data = [];
+        foreach ($reviews as $review) {
+            $rating  = intval(get_comment_meta($review->comment_ID, 'rating', true));
+            $data[]  = [
+                'id'       => $review->comment_ID,
+                'rating'   => $rating,
+                'author'   => $review->comment_author,
+                'date'     => $review->comment_date,
+                'content'  => wp_strip_all_tags($review->comment_content),
+                'verified' => (bool) wc_review_is_from_verified_owner($review->comment_ID),
+            ];
+        }
+
+        return rest_ensure_response([
+            'reviews' => $data,
+            'total'   => count($data),
+        ]);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -310,6 +359,8 @@ class Shopwalk_WC_Products {
             'categories'        => $categories,
             'images'            => $images,
             'url'               => $product->get_permalink(),
+            'average_rating'    => (float) $product->get_average_rating(),
+            'rating_count'      => (int) $product->get_rating_count(),
         ];
 
         if ($detailed) {

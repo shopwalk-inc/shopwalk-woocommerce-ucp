@@ -577,6 +577,8 @@ class Shopwalk_WC_Sync {
                 'on_sale'           => $on_sale,
                 'source_url'        => get_permalink($product->get_id()),
                 'images'            => $images,
+                'average_rating'    => (float) $product->get_average_rating(),
+                'rating_count'      => (int) $product->get_rating_count(),
             ],
         ];
     }
