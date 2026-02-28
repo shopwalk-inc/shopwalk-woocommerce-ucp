@@ -4,7 +4,7 @@ Tags: ai shopping, product sync, woocommerce, ai commerce, ai checkout, ucp
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -161,6 +161,9 @@ Yes. Shopwalk AI is fully compatible with WooCommerce HPOS (Custom Order Tables)
 
 == Changelog ==
 
+= 1.3.0 =
+* Added UCP review submission endpoint — Shopwalk users can now post reviews to merchant stores
+
 = 1.2.0 =
 * Added product ratings and review count to sync payload
 * Added UCP reviews endpoint for Shopwalk to fetch product reviews
@@ -193,6 +196,9 @@ Yes. Shopwalk AI is fully compatible with WooCommerce HPOS (Custom Order Tables)
 * HPOS compatibility
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+Adds POST /shopwalk/v1/reviews so Shopwalk users can submit reviews directly to your store (held for moderation).
 
 = 1.2.0 =
 Adds product ratings/review count to the sync payload and a new authenticated reviews endpoint.

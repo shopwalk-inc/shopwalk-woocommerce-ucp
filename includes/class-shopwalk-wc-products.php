@@ -54,11 +54,25 @@ class Shopwalk_WC_Products {
 
         // Product reviews (protected — requires Inbound API Key)
         register_rest_route($namespace, '/reviews', [
-            'methods'             => 'GET',
-            'callback'            => [$this, 'get_reviews'],
-            'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
-            'args'                => [
-                'product_id' => ['type' => 'integer', 'required' => true, 'minimum' => 1],
+            [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'get_reviews'],
+                'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
+                'args'                => [
+                    'product_id' => ['type' => 'integer', 'required' => true, 'minimum' => 1],
+                ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [$this, 'submit_review'],
+                'permission_callback' => [Shopwalk_WC_Auth::class, 'check_permission'],
+                'args'                => [
+                    'product_id'        => ['type' => 'integer', 'required' => true],
+                    'rating'            => ['type' => 'integer', 'required' => true],
+                    'content'           => ['type' => 'string',  'required' => true],
+                    'author_name'       => ['type' => 'string',  'required' => true],
+                    'verified_purchase' => ['type' => 'boolean', 'default' => false],
+                ],
             ],
         ]);
     }
@@ -291,6 +305,73 @@ class Shopwalk_WC_Products {
         return rest_ensure_response([
             'reviews' => $data,
             'total'   => count($data),
+        ]);
+    }
+
+    /**
+     * Submit Review Endpoint.
+     * Allows Shopwalk users to post a review to the merchant's WooCommerce store.
+     * Review is held for merchant moderation (comment_status = 'hold').
+     * Protected by Inbound API Key (Authorization: Bearer <key>).
+     */
+    public function submit_review(WP_REST_Request $request): WP_REST_Response|WP_Error {
+        $product_id        = intval($request->get_param('product_id'));
+        $rating            = intval($request->get_param('rating'));
+        $content           = sanitize_textarea_field($request->get_param('content'));
+        $author_name       = sanitize_text_field($request->get_param('author_name'));
+        $verified_purchase = (bool) $request->get_param('verified_purchase');
+
+        // Validate required fields
+        if (!$product_id || !$rating || !$content || !$author_name) {
+            return new WP_Error('missing_params', 'product_id, rating, content, and author_name are required', ['status' => 400]);
+        }
+
+        // Validate rating range
+        if ($rating < 1 || $rating > 5) {
+            return new WP_Error('invalid_rating', 'Rating must be between 1 and 5', ['status' => 400]);
+        }
+
+        // Check product exists
+        $product = wc_get_product($product_id);
+        if (!$product) {
+            return new WP_Error('not_found', 'Product not found', ['status' => 404]);
+        }
+
+        // Create the WC review (as a comment), held for merchant moderation
+        $comment_data = [
+            'comment_post_ID'      => $product_id,
+            'comment_author'       => $author_name,
+            'comment_author_email' => 'shopwalk-review-' . $product_id . '@shopwalk.com',
+            'comment_content'      => $content,
+            'comment_type'         => 'review',
+            'comment_status'       => 'hold',
+            'comment_meta'         => [
+                'rating'          => $rating,
+                'verified'        => $verified_purchase ? 1 : 0,
+                'shopwalk_review' => 1,
+            ],
+        ];
+
+        $comment_id = wp_insert_comment($comment_data);
+
+        if (!$comment_id || is_wp_error($comment_id)) {
+            return new WP_Error('insert_failed', 'Failed to create review', ['status' => 500]);
+        }
+
+        // Add comment meta separately (wp_insert_comment doesn't support comment_meta in all WP versions)
+        update_comment_meta($comment_id, 'rating', $rating);
+        update_comment_meta($comment_id, 'verified', $verified_purchase ? 1 : 0);
+        update_comment_meta($comment_id, 'shopwalk_review', 1);
+
+        return rest_ensure_response([
+            'id'               => $comment_id,
+            'product_id'       => $product_id,
+            'rating'           => $rating,
+            'author'           => $author_name,
+            'content'          => $content,
+            'verified_purchase' => $verified_purchase,
+            'status'           => 'pending',
+            'created_at'       => current_time('c'),
         ]);
     }
 
