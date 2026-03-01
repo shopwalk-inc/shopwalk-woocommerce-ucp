@@ -1,2 +1,4 @@
-# All files — requires review from a Shopwalk maintainer
-* @shopwalk-inc/owners
+# Shopwalk WooCommerce UCP Plugin — Code Owners
+# Jake Bushman is the sole maintainer.
+# All PRs require his review before merging.
+* @jbushman
