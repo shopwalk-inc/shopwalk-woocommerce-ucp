@@ -15,14 +15,15 @@ class Shopwalk_WC_Orders {
      * Maps WooCommerce order statuses to UCP statuses.
      */
     private const STATUS_MAP = [
-        'pending'    => 'pending',
-        'on-hold'    => 'pending',
-        'processing' => 'confirmed',
-        'completed'  => 'fulfilled',
-        'cancelled'  => 'cancelled',
+        'pending'    => 'processing',
+        'on-hold'    => 'processing',
+        'processing' => 'processing',
+        'completed'  => 'delivered',
+        'cancelled'  => 'canceled',
         'refunded'   => 'refunded',
-        'failed'     => 'cancelled',
+        'failed'     => 'canceled',
         'shipped'    => 'shipped',
+        'in-transit' => 'in_transit',
     ];
 
     public function register_routes(string $namespace): void {
@@ -218,14 +219,18 @@ class Shopwalk_WC_Orders {
     // -------------------------------------------------------------------------
 
     private function find_shopwalk_order(string $order_id): ?WC_Order {
-        // Format: sw_order_{order_id} or sw_{order_id}
-        $wc_order_id = (int) str_replace(['sw_order_', 'sw_'], '', $order_id);
+        // Formats: ord_{id}, sw_order_{id}, sw_{id}, chk_{id}
+        $wc_order_id = (int) str_replace(['ord_', 'sw_order_', 'sw_', 'chk_'], '', $order_id);
         if ($wc_order_id <= 0) {
             return null;
         }
 
         $order = wc_get_order($wc_order_id);
-        return ($order && $order->get_meta('_shopwalk_status') === 'completed') ? $order : null;
+        if (!$order) {
+            return null;
+        }
+        // Accept any Shopwalk-originated order (has session meta)
+        return $order->get_meta('_shopwalk_session_id') ? $order : null;
     }
 
     /**
