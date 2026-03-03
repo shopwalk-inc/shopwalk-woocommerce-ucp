@@ -67,7 +67,7 @@ class Shopwalk_WC_Sync {
     /**
      * Get the Shopwalk plugin key from settings (unified key).
      */
-    private function get_api_key(): string {
+    protected function get_api_key(): string {
         return get_option('shopwalk_wc_plugin_key', '');
     }
 
@@ -75,7 +75,7 @@ class Shopwalk_WC_Sync {
      * Get the merchant ID.
      * Uses the configured option, or auto-derives from the site URL.
      */
-    private function get_merchant_id(): string {
+    protected function get_merchant_id(): string {
         $configured = get_option('shopwalk_wc_merchant_id', '');
         if (!empty($configured)) {
             return $configured;
@@ -96,7 +96,7 @@ class Shopwalk_WC_Sync {
      * @param  array $payload Structured event array.
      * @return bool  true on success, false on failure.
      */
-    private function send_event(array $payload): bool {
+    protected function send_event(array $payload): bool {
         $api_key = $this->get_api_key();
         if (empty($api_key)) {
             return false;
@@ -119,6 +119,14 @@ class Shopwalk_WC_Sync {
         }
 
         $code = wp_remote_retrieve_response_code($response);
+
+        // 401: invalid/expired key — mark invalid, do NOT queue (would retry forever)
+        if ($code === 401) {
+            update_option('shopwalk_wc_key_invalid', 1);
+            update_option('shopwalk_wc_sync_status', 'Error: invalid API key (401)');
+            return false;
+        }
+
         if ($code < 200 || $code >= 300) {
             $this->push_to_queue($body);
             return false;
@@ -137,7 +145,7 @@ class Shopwalk_WC_Sync {
      *
      * @param string $payload_json JSON-encoded event payload.
      */
-    private function push_to_queue(string $payload_json): void {
+    protected function push_to_queue(string $payload_json): void {
         $queue = get_option(self::QUEUE_OPTION, []);
         if (!is_array($queue)) {
             $queue = [];
@@ -162,6 +170,11 @@ class Shopwalk_WC_Sync {
             return;
         }
 
+        // Stop retrying if key has been flagged invalid (e.g. after a 401 response)
+        if (get_option('shopwalk_wc_key_invalid', 0)) {
+            return;
+        }
+
         $queue = get_option(self::QUEUE_OPTION, []);
         if (empty($queue) || !is_array($queue)) {
             return;
@@ -172,22 +185,7 @@ class Shopwalk_WC_Sync {
         $failed    = [];
 
         foreach ($batch as $payload_json) {
-            $response = wp_remote_post(self::SYNC_ENDPOINT, [
-                'timeout' => 10,
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'X-API-Key'    => $api_key,
-                ],
-                'body' => $payload_json,
-            ]);
-
-            $ok = !is_wp_error($response);
-            if ($ok) {
-                $code = wp_remote_retrieve_response_code($response);
-                $ok   = ($code >= 200 && $code < 300);
-            }
-
-            if (!$ok) {
+            if (!$this->flush_one($api_key, $payload_json)) {
                 $failed[] = $payload_json; // Keep for next attempt
             }
         }
@@ -521,7 +519,7 @@ class Shopwalk_WC_Sync {
      * @param  WC_Product $product
      * @return array
      */
-    private function build_upsert_event(WC_Product $product): array {
+    protected function build_upsert_event(WC_Product $product): array {
         // Categories
         $categories = [];
         $terms = get_the_terms($product->get_id(), 'product_cat');
@@ -581,6 +579,38 @@ class Shopwalk_WC_Sync {
                 'rating_count'      => (int) $product->get_rating_count(),
             ],
         ];
+    }
+    /**
+     * Send a single queued payload. Extracted from flush_sync_queue for testability.
+     * Detects 401 Unauthorized and marks the key as invalid to stop infinite retries.
+     *
+     * @param  string $api_key      The plugin API key.
+     * @param  string $payload_json JSON-encoded event payload.
+     * @return bool   true on success, false on any failure.
+     */
+    protected function flush_one(string $api_key, string $payload_json): bool {
+        $response = wp_remote_post(self::SYNC_ENDPOINT, [
+            'timeout' => 10,
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key'    => $api_key,
+            ],
+            'body' => $payload_json,
+        ]);
+
+        if (is_wp_error($response)) {
+            return false;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+
+        if ($code === 401) {
+            update_option('shopwalk_wc_key_invalid', 1);
+            update_option('shopwalk_wc_sync_status', 'Error: invalid API key (401)');
+            return false;
+        }
+
+        return ($code >= 200 && $code < 300);
     }
 }
 
