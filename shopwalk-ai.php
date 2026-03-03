@@ -33,7 +33,7 @@
 
 defined('ABSPATH') || exit;
 
-define('SHOPWALK_AI_VERSION',    '1.4.0');
+define('SHOPWALK_AI_VERSION',    '1.5.0');
 define('SHOPWALK_AI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SHOPWALK_AI_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -121,7 +121,74 @@ function shopwalk_ai_activate(): void {
     if (class_exists('Shopwalk_WC_Sync')) {
         Shopwalk_WC_Sync::schedule_cron();
     }
+    // Auto-register this store with Shopwalk — no manual setup required.
+    // If the network call fails, a transient flag is set and retried on admin_init.
+    shopwalk_ai_auto_register();
 }
+/**
+ * Attempt to auto-register (or re-register) this store with Shopwalk.
+ *
+ * Called on activation and retried on admin_init when a previous attempt failed.
+ * Idempotent — safe to call multiple times; the API returns the same key for the same site_url.
+ *
+ * @return bool True if registration succeeded or was already complete.
+ */
+function shopwalk_ai_auto_register(): bool {
+    // Already registered — nothing to do.
+    if (!empty(get_option('shopwalk_wc_plugin_key', ''))) {
+        delete_transient('shopwalk_wc_needs_registration');
+        return true;
+    }
+
+    $site_url    = home_url();
+    $store_name  = get_bloginfo('name') ?: wp_parse_url($site_url, PHP_URL_HOST);
+    $admin_email = get_option('admin_email', '');
+
+    $response = wp_remote_post('https://api.shopwalk.com/api/v1/plugin/register', [
+        'headers' => ['Content-Type' => 'application/json'],
+        'body'    => wp_json_encode([
+            'site_url'       => $site_url,
+            'store_name'     => $store_name,
+            'admin_email'    => $admin_email,
+            'wc_version'     => defined('WC_VERSION') ? WC_VERSION : '',
+            'plugin_version' => SHOPWALK_AI_VERSION,
+        ]),
+        'timeout' => 20,
+    ]);
+
+    if (is_wp_error($response)) {
+        // Network failure — schedule a retry on next admin page load.
+        set_transient('shopwalk_wc_needs_registration', 1, DAY_IN_SECONDS);
+        return false;
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+
+    if ($code !== 200 || empty($body['api_key'])) {
+        set_transient('shopwalk_wc_needs_registration', 1, DAY_IN_SECONDS);
+        return false;
+    }
+
+    // Store credentials and mark as active.
+    update_option('shopwalk_wc_plugin_key', $body['api_key']);
+    update_option('shopwalk_wc_license_status', 'active');
+    if (!empty($body['merchant_id'])) {
+        update_option('shopwalk_wc_merchant_id', $body['merchant_id']);
+    }
+    delete_transient('shopwalk_wc_needs_registration');
+    flush_rewrite_rules();
+    return true;
+}
+
+/**
+ * On admin_init, silently retry registration if a previous attempt failed.
+ */
+add_action('admin_init', function (): void {
+    if (get_transient('shopwalk_wc_needs_registration')) {
+        shopwalk_ai_auto_register();
+    }
+});
 register_activation_hook(__FILE__, 'shopwalk_ai_activate');
 
 /**
