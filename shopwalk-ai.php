@@ -112,9 +112,11 @@ function shopwalk_ai_init(): void {
 	require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-sync.php';
 	require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-updater.php';
 	require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-dashboard.php';
+	require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-cdn.php';
 
 	// Boot.
 	Shopwalk_WC::instance();
+	Shopwalk_WC_CDN::init();
 }
 add_action( 'plugins_loaded', 'shopwalk_ai_init' );
 

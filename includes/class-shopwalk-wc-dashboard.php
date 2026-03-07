@@ -76,6 +76,12 @@ class Shopwalk_WC_Dashboard {
 	 *
 	 * @var mixed
 	 */
+	private const CDN_TOGGLE_ENDPOINT = 'https://api.shopwalk.com/api/v1/plugin/cdn-toggle';
+	/**
+	 * Property.
+	 *
+	 * @var mixed
+	 */
 	private const CACHE_TTL = 300; // 5 minutes.
 
 	/**
@@ -90,6 +96,7 @@ class Shopwalk_WC_Dashboard {
 		add_action( 'wp_ajax_shopwalk_migrate', array( $this, 'ajax_migrate' ) );
 		add_action( 'wp_ajax_shopwalk_portal_url', array( $this, 'ajax_portal_url' ) );
 		add_action( 'wp_ajax_shopwalk_run_diagnostics', array( $this, 'ajax_run_diagnostics' ) );
+		add_action( 'wp_ajax_shopwalk_cdn_toggle', array( $this, 'ajax_cdn_toggle' ) );
 	}
 
 	/**
@@ -219,28 +226,57 @@ class Shopwalk_WC_Dashboard {
 				</div>
 			</div>
 
-			<!-- Stats Cards -->
+			<!-- Stats Cards (3 cards) -->
 			<div class="sw-cards">
 				<div class="sw-card sw-card-blue">
 					<div class="sw-card-label"><?php esc_html_e( 'Products Indexed', 'shopwalk-ai' ); ?></div>
 					<div class="sw-card-value" id="sw-product-count">—</div>
 					<div class="sw-card-sub" id="sw-last-synced"><?php esc_html_e( 'Loading…', 'shopwalk-ai' ); ?></div>
 				</div>
-				<div class="sw-card sw-card-green">
-					<div class="sw-card-label"><?php esc_html_e( 'AI Agent Requests', 'shopwalk-ai' ); ?></div>
-					<div class="sw-card-value" id="sw-ucp-requests">—</div>
-					<div class="sw-card-sub" id="sw-ucp-last"><?php esc_html_e( 'Loading…', 'shopwalk-ai' ); ?></div>
-				</div>
-				<div class="sw-card sw-card-blue" id="sw-ucp-card">
-					<div class="sw-card-label"><?php esc_html_e( 'UCP Endpoint', 'shopwalk-ai' ); ?></div>
-					<div class="sw-card-value" style="font-size:18px;" id="sw-ucp-status"><?php esc_html_e( 'Checking…', 'shopwalk-ai' ); ?></div>
-					<div class="sw-card-sub" id="sw-ucp-endpoint" style="word-break:break-all;font-size:11px;">—</div>
+				<div class="sw-card sw-card-green" id="sw-cdn-card">
+					<div class="sw-card-label"><?php esc_html_e( 'Images on CDN', 'shopwalk-ai' ); ?></div>
+					<div class="sw-card-value" id="sw-cdn-count">—</div>
+					<div class="sw-card-sub" id="sw-cdn-sub"><?php esc_html_e( 'Loading…', 'shopwalk-ai' ); ?></div>
 				</div>
 				<div class="sw-card sw-card-blue">
 					<div class="sw-card-label"><?php esc_html_e( 'Plugin Version', 'shopwalk-ai' ); ?></div>
 					<div class="sw-card-value" style="font-size:24px;"><?php echo esc_html( SHOPWALK_AI_VERSION ); ?></div>
 					<div class="sw-card-sub" id="sw-update-note">—</div>
 				</div>
+			</div>
+
+			<!-- AI-Enabled & Boosted Hero -->
+			<div class="sw-section sw-section-hero" style="background:linear-gradient(135deg,#f0fdf4 0%,#eff6ff 100%);border-color:#d1fae5;">
+				<div style="display:flex;align-items:flex-start;gap:16px;">
+					<div style="font-size:32px;line-height:1;">✦</div>
+					<div>
+						<h3 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1d2327;border:none;padding:0;">
+							<?php esc_html_e( 'Shopwalk has AI-enabled and boosted your store.', 'shopwalk-ai' ); ?>
+						</h3>
+						<p style="margin:0;font-size:13px;color:#374151;line-height:1.6;" id="sw-hero-body">
+							<?php esc_html_e( 'Your products are synced and powering Shopwalk AI. Upgrade to Pro to add an AI shopping assistant directly to your store.', 'shopwalk-ai' ); ?>
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- CDN Section -->
+			<div class="sw-section">
+				<h3><?php esc_html_e( 'Shopwalk CDN — Turbo Boost Images', 'shopwalk-ai' ); ?></h3>
+				<p style="margin:0 0 16px;font-size:13px;color:#646970;" id="sw-cdn-desc">
+					<?php esc_html_e( 'Serve your product images from Shopwalk\'s global CDN for faster page loads and better Core Web Vitals.', 'shopwalk-ai' ); ?>
+				</p>
+				<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+					<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1d2327;">
+						<input type="checkbox" id="sw-cdn-toggle" style="width:18px;height:18px;cursor:pointer;" <?php echo get_option( 'shopwalk_cdn_enabled', false ) ? 'checked' : ''; ?> />
+						<?php esc_html_e( 'Enable Shopwalk CDN Images', 'shopwalk-ai' ); ?>
+					</label>
+					<span id="sw-cdn-toggle-status" style="font-size:12px;color:#646970;"></span>
+				</div>
+				<p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">
+					<?php esc_html_e( 'Verify your speed improvement in Google PageSpeed Insights after enabling.', 'shopwalk-ai' ); ?>
+				</p>
+				<div id="sw-cdn-result" class="sw-inline-result"></div>
 			</div>
 
 			<!-- Subscription Section -->
@@ -428,7 +464,8 @@ class Shopwalk_WC_Dashboard {
 						badge.addClass('error').html('<span class="sw-status-dot"></span> <?php echo esc_js( __( 'UCP Unreachable', 'shopwalk-ai' ) ); ?>');
 					}
 
-					$('#sw-update-note').text('<?php echo esc_js( __( 'Up to date', 'shopwalk-ai' ) ); ?>');
+					renderCdnStats(d);
+				$('#sw-update-note').text('<?php echo esc_js( __( 'Up to date', 'shopwalk-ai' ) ); ?>');
 				});
 			}
 
@@ -603,6 +640,63 @@ class Shopwalk_WC_Dashboard {
 			function doPost(action, extra, cb) {
 				$.post(ajaxurl, $.extend({ action: action, nonce: nonce }, extra), cb);
 			}
+
+			/** ---- CDN Stats ---- */
+			function renderCdnStats(d) {
+				var count = d.cdn_image_count || 0;
+				var total = d.cdn_total_images || 0;
+				var savingsMs = d.cdn_savings_ms || 0;
+				var enabled = d.cdn_enabled || false;
+
+				$('#sw-cdn-count').text(count.toLocaleString() + (total > 0 ? ' / ' + total.toLocaleString() : ''));
+
+				if (total > 0 && count >= total) {
+					$('#sw-cdn-card').removeClass('sw-card-blue').addClass('sw-card-green');
+					$('#sw-cdn-sub').text('<?php echo esc_js( __( 'All images cached ✓', 'shopwalk-ai' ) ); ?>');
+				} else if (count > 0) {
+					$('#sw-cdn-sub').text('<?php echo esc_js( __( 'Caching in progress…', 'shopwalk-ai' ) ); ?>');
+				} else {
+					$('#sw-cdn-sub').text('<?php echo esc_js( __( 'Awaiting first sync', 'shopwalk-ai' ) ); ?>');
+				}
+
+				if (enabled && savingsMs > 0) {
+					$('#sw-cdn-desc').text('<?php echo esc_js( __( 'Your product images are served from Shopwalk\'s global CDN. Estimated page speed improvement: ', 'shopwalk-ai' ) ); ?>' + savingsMs + 'ms.');
+				}
+
+				// Sync checkbox state
+				$('#sw-cdn-toggle').prop('checked', enabled);
+
+				// Hero body — update with real numbers
+				if (d.product_count > 0 || count > 0) {
+					var parts = [];
+					if (d.product_count > 0) parts.push(d.product_count.toLocaleString() + ' <?php echo esc_js( __( 'products synced', 'shopwalk-ai' ) ); ?>');
+					if (count > 0) parts.push(count.toLocaleString() + ' <?php echo esc_js( __( 'images on CDN', 'shopwalk-ai' ) ); ?>');
+					if (savingsMs > 0) parts.push('~' + savingsMs + 'ms <?php echo esc_js( __( 'faster page loads', 'shopwalk-ai' ) ); ?>');
+					if (parts.length > 0) {
+						$('#sw-hero-body').text(parts.join(' · ') + '. <?php echo esc_js( __( 'Upgrade to Pro to add an AI shopping assistant directly to your store.', 'shopwalk-ai' ) ); ?>');
+					}
+				}
+			}
+
+			/** ---- CDN Toggle ---- */
+			$('#sw-cdn-toggle').on('change', function() {
+				var enabled = $(this).prop('checked');
+				var $status = $('#sw-cdn-toggle-status');
+				$status.text('<?php echo esc_js( __( 'Saving…', 'shopwalk-ai' ) ); ?>');
+				$('#sw-cdn-result').hide();
+
+				$.post(ajaxurl, { action: 'shopwalk_cdn_toggle', nonce: nonce, enabled: enabled ? 1 : 0 }, function(resp) {
+					if (resp.success) {
+						$status.text(enabled ? '<?php echo esc_js( __( '✓ CDN enabled', 'shopwalk-ai' ) ); ?>' : '<?php echo esc_js( __( 'CDN disabled', 'shopwalk-ai' ) ); ?>');
+						setTimeout(function() { $status.text(''); }, 3000);
+					} else {
+						$('#sw-cdn-toggle').prop('checked', !enabled); // revert
+						$status.text('');
+						$('#sw-cdn-result').removeClass('success').addClass('error')
+							.text((resp.data && resp.data.message) || '<?php echo esc_js( __( 'Failed to update CDN setting.', 'shopwalk-ai' ) ); ?>').show();
+					}
+				});
+			});
 
 			/** ---- Init ---- */
 
@@ -933,5 +1027,43 @@ class Shopwalk_WC_Dashboard {
 		);
 
 		wp_send_json_success( array( 'checks' => $checks ) );
+	}
+
+	/**
+	 * AJAX: Toggle CDN image serving.
+	 */
+	public function ajax_cdn_toggle(): void {
+		$this->check_permission();
+
+		$enabled = ! empty( $_POST['enabled'] ) && '1' === $_POST['enabled']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$response = wp_remote_request(
+			self::CDN_TOGGLE_ENDPOINT,
+			array(
+				'method'  => 'PUT',
+				'headers' => array(
+					'X-SW-Domain'  => home_url(),
+					'Content-Type' => 'application/json',
+				),
+				'body'    => wp_json_encode( array( 'enabled' => $enabled ) ),
+				'timeout' => 10,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( array( 'message' => 'Could not reach Shopwalk API.' ) );
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( 200 !== $code ) {
+			wp_send_json_error( array( 'message' => $body['message'] ?? 'Failed to update CDN setting.' ) );
+		}
+
+		// Persist locally so CDN class can read it on page render.
+		update_option( 'shopwalk_cdn_enabled', $enabled );
+
+		wp_send_json_success( array( 'message' => $body['message'] ?? 'CDN setting updated.', 'enabled' => $enabled ) );
 	}
 }
