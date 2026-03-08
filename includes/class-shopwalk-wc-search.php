@@ -77,7 +77,7 @@ class Shopwalk_WC_Search {
 			'shopwalk-search',
 			'shopwalkSearch',
 			array(
-				'apiUrl'          => rest_url( 'shopwalk-api/v1/' ),
+				'apiUrl'          => 'https://api.shopwalk.com/api/v1/plugin/search',
 				'apiKey'          => $api_key,
 				'merchantId'      => $merchant_id,
 				'popularProducts' => $popular_products,
