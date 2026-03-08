@@ -117,6 +117,9 @@ function shopwalk_ai_init(): void {
 		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-updater.php';
 		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-dashboard.php';
 		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-cdn.php';
+		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-search.php';
+		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-ai-assist.php';
+		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-shopwalk-wc-search-gaps.php';
 
 		// Boot.
 		Shopwalk_WC::instance();
@@ -168,6 +171,10 @@ function shopwalk_ai_activate(): void {
 	// Schedule the sync queue flush cron (every 5 min).
 	if ( class_exists( 'Shopwalk_WC_Sync' ) ) {
 		Shopwalk_WC_Sync::schedule_cron();
+	}
+	// Schedule the heartbeat cron (every 15 min) — will only run if API key exists.
+	if ( ! wp_next_scheduled( 'shopwalk_sync_heartbeat' ) ) {
+		wp_schedule_event( time(), '15mins', 'shopwalk_sync_heartbeat' );
 	}
 	// Schedule hourly license refresh cron.
 	if ( ! wp_next_scheduled( 'shopwalk_license_refresh' ) ) {
@@ -305,6 +312,11 @@ function shopwalk_ai_deactivate(): void {
 	// Remove the sync queue flush cron.
 	if ( class_exists( 'Shopwalk_WC_Sync' ) ) {
 		Shopwalk_WC_Sync::unschedule_cron();
+	}
+	// Remove the heartbeat cron.
+	$timestamp = wp_next_scheduled( 'shopwalk_sync_heartbeat' );
+	if ( $timestamp ) {
+		wp_unschedule_event( $timestamp, 'shopwalk_sync_heartbeat' );
 	}
 	// Remove the hourly license refresh cron.
 	$timestamp = wp_next_scheduled( 'shopwalk_license_refresh' );

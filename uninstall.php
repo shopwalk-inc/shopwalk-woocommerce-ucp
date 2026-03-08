@@ -62,6 +62,13 @@ $options = array(
 	'shopwalk_license_refreshed_at',
 	// CDN (v1.8.0).
 	'shopwalk_store_boost_enabled',
+	// Cache counts (v1.10.4).
+	'shopwalk_cdn_image_count',
+	'shopwalk_cdn_total_images',
+	// Feature toggles (v1.10.4).
+	'shopwalk_feature_search_enabled',
+	'shopwalk_feature_ai_descriptions_enabled',
+	'shopwalk_feature_ucp_enabled',
 	// Legacy keys (kept for clean migration from older versions).
 	'shopwalk_wc_license_key',
 	'shopwalk_wc_shopwalk_api_key',
@@ -72,5 +79,6 @@ foreach ( $options as $option ) {
 	delete_option( $option );
 }
 
-// Remove cached update transient.
+// Remove cached transient and cached image IDs.
 delete_transient( 'shopwalk_wc_update_info' );
+delete_transient( 'shopwalk_cached_image_ids' );
