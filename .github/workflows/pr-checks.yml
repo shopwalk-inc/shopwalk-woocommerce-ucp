@@ -38,5 +38,5 @@ jobs:
           done
 
           STABLE=$(grep "^Stable tag:" readme.txt | sed 's/Stable tag: //' | tr -d '[:space:]')
-          VERSION=$(grep "define('SHOPWALK_AI_VERSION'" shopwalk-ai.php | grep -o "'[0-9.]*'" | tr -d "'")
+          VERSION=$(grep -E "define\s*\(\s*'SHOPWALK_AI_VERSION'" shopwalk-ai.php | grep -o "'[0-9.]*'" | tr -d "'")
           [ "$STABLE" = "$VERSION" ] && echo "✅ Stable tag: $STABLE" || { echo "❌ $STABLE != $VERSION"; exit 1; }
