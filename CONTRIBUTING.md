@@ -20,7 +20,7 @@ Thank you for your interest in contributing! This plugin implements the [Univers
 ## What We Don't Accept (Yet)
 
 - New payment gateways (UCP handles this at the platform level)
-- UI changes to the WooCommerce checkout (controlled by the merchant's theme)
+- UI changes to the WooCommerce checkout (controlled by the partner's theme)
 - Features that require changes to the UCP spec
 
 ## Code Style

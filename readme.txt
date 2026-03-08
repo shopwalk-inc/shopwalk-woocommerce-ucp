@@ -4,7 +4,7 @@ Tags: woocommerce, ai, search, ecommerce, product-sync
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
-Stable tag: 1.11.0
+Stable tag: 1.12.0
 WC tested up to: 10.5
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -36,7 +36,7 @@ Modern shoppers increasingly use AI to find and buy products. Shopwalk AI bridge
 * **Session expiry** — Checkout sessions automatically expire after 24 hours for security.
 * **Order webhooks** — Real-time order status notifications keep AI agents in sync with your fulfillment workflow.
 * **UCP discovery** — `/.well-known/ucp` endpoint broadcasts your store's full UCP capabilities to any AI agent.
-* **Merchant dashboard** — See products indexed, AI agent request count, UCP health, subscription status, and self-service tools directly in WP Admin.
+* **Partner dashboard** — See products indexed, AI agent request count, UCP health, subscription status, and self-service tools directly in WP Admin.
 * **Upgrade / downgrade in-place** — Manage your Shopwalk Pro subscription without leaving WP Admin.
 
 = Getting Started =
@@ -71,7 +71,7 @@ All endpoints are available at both `/wp-json/shopwalk/v1/` (UCP standard) and `
 This plugin communicates with the **Shopwalk API** (https://api.shopwalk.com) for the following purposes:
 
 **On activation:**
-Sends your site URL, WordPress version, and WooCommerce version to register your store and obtain a merchant ID. No account creation or license key is required.
+Sends your site URL, WordPress version, and WooCommerce version to register your store and obtain a partner ID. No account creation or license key is required.
 Data sent: `site_url`, `wp_version`, `wc_version`
 
 **On product save / update:**
@@ -154,6 +154,9 @@ Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your d
 
 == Changelog ==
 
+= 1.12.0 =
+* docs: Rename "merchant" to "partner" in documentation and user-facing text
+
 = 1.11.0 =
 * feat: Semantic search overlay with AI-powered product discovery
 * feat: AI description improvement with SSE streaming
@@ -168,7 +171,7 @@ Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your d
 
 = 1.9.0 =
 * Feature: CDN image rewriting — product images served from cdn.shopwalk.com (enable in Settings > Advanced)
-* Path scheme: merchants/{merchant_id}/md5({url}).{ext} — deterministic, zero API calls
+* Path scheme: partners/{partner_id}/md5({url}).{ext} — deterministic, zero API calls
 * Hooks wp_get_attachment_url, wp_get_attachment_image_src, wp_calculate_image_srcset
 
 = 1.8.0 =
@@ -182,22 +185,22 @@ Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your d
 * NEW: Hourly license refresh via WP-Cron — `shopwalk_license_refresh` event keeps license status current
 * NEW: `shopwalk_is_pro()` helper function for use by Shopwalk Pro plugin
 * NEW: Self-service dashboard — upgrade, downgrade, cancel, undo cancel, migrate domain, Stripe portal, and diagnostics from WP Admin
-* NEW: Domain migration tool — updates merchant binding when moving to a new domain
-* NEW: Diagnostics panel — checks PHP version, WC version, WP version, memory limit, API connectivity, UCP endpoint, license status, and merchant ID
-* IMPROVED: Auto-registration is now idempotent — safe to call multiple times; re-registers if merchant was soft-deleted
+* NEW: Domain migration tool — updates partner binding when moving to a new domain
+* NEW: Diagnostics panel — checks PHP version, WC version, WP version, memory limit, API connectivity, UCP endpoint, license status, and partner ID
+* IMPROVED: Auto-registration is now idempotent — safe to call multiple times; re-registers if partner was soft-deleted
 * IMPROVED: Registration payload now includes `registration_token` when `SHOPWALK_REGISTRATION_TOKEN` is defined (used by Pro downloads)
 
 = 1.6.0 =
-* NEW: Merchant dashboard page in WP Admin (WooCommerce → Shopwalk)
+* NEW: Partner dashboard page in WP Admin (WooCommerce → Shopwalk)
 * NEW: Dashboard shows products indexed, AI agent request count, UCP health status, and plugin version
 * NEW: Dashboard data cached for 5 minutes to avoid unnecessary API calls
-* NEW: API tracks `ucp_request_count` and `ucp_last_request_at` per merchant
+* NEW: API tracks `ucp_request_count` and `ucp_last_request_at` per partner
 
 = 1.5.0 =
 * NEW: Auto-register store on plugin activation — no manual setup required
 * NEW: Transient-based retry — if registration fails on activation, retries silently on next `admin_init`
 * NEW: Deactivation hook notifies Shopwalk API so feeds pause immediately (non-blocking, fire-and-forget)
-* IMPROVED: Merchant soft-delete on deactivation — data preserved, restored on re-activation
+* IMPROVED: Partner soft-delete on deactivation — data preserved, restored on re-activation
 
 = 1.4.0 =
 * FIX: Webhooks class uses WC hooks instead of REST routes — must be instantiated in `init_hooks()`
@@ -208,7 +211,7 @@ Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your d
 * FIX: 401 responses from UCP endpoint no longer added to retry queue
 
 = 1.3.0 =
-* Added UCP review submission endpoint — Shopwalk users can now post reviews to merchant stores
+* Added UCP review submission endpoint — Shopwalk users can now post reviews to partner stores
 
 = 1.2.0 =
 * Added product ratings and review count to sync payload
@@ -239,10 +242,10 @@ Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your d
 == Upgrade Notice ==
 
 = 1.7.0 =
-Major update: server-side license model and full self-service dashboard. No action required on upgrade — your merchant ID and product sync continue uninterrupted.
+Major update: server-side license model and full self-service dashboard. No action required on upgrade — your partner ID and product sync continue uninterrupted.
 
 = 1.6.0 =
-Adds merchant dashboard to WP Admin. No action required.
+Adds partner dashboard to WP Admin. No action required.
 
 = 1.5.0 =
 Plugin now auto-registers on activation. Existing installs are unaffected.

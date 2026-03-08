@@ -65,8 +65,8 @@ We do not pursue legal action against researchers who follow this policy.
 
 For contributors and security researchers:
 
-- The plugin's outbound API key (`sw_site_...`) is scoped to a single domain. It cannot be used to access other merchants' data.
-- The inbound API key protects UCP endpoints on the merchant's store. It is stored in `wp_options` — the same security model as WooCommerce's own payment credentials.
+- The plugin's outbound API key (`sw_site_...`) is scoped to a single domain. It cannot be used to access other partners' data.
+- The inbound API key protects UCP endpoints on the partner's store. It is stored in `wp_options` — the same security model as WooCommerce's own payment credentials.
 - All inbound requests are validated with WordPress nonces where applicable.
 - No customer PII is sent to Shopwalk's API — only product catalog data.
 - All strings are sanitized on input (`sanitize_text_field`, `wp_kses`, etc.) and escaped on output (`esc_html`, `esc_attr`, etc.).

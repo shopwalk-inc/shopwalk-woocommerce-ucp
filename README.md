@@ -1,6 +1,6 @@
 # Shopwalk AI — WooCommerce Plugin
 
-[![Plugin Version](https://img.shields.io/badge/version-1.1.0-blue)](https://shopwalk.com/woocommerce)
+[![Plugin Version](https://img.shields.io/badge/version-1.12.0-blue)](https://shopwalk.com/woocommerce)
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-a46497)](https://woocommerce.com)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-21759b)](https://wordpress.org)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-777bb4)](https://php.net)
@@ -63,7 +63,7 @@ That's it. Your store is connected and syncing.
 When you click **Connect to Shopwalk AI**, the plugin calls the Shopwalk API and registers your store. You receive a free API key (`sw_site_...`) that is stored in your WordPress database. No account creation, no credit card, no forms.
 
 ```
-Store Admin Click → POST /api/v1/plugin/register → {api_key, merchant_id}
+Store Admin Click → POST /api/v1/plugin/register → {api_key, partner_id}
 ```
 
 ### 2. Product Sync
