@@ -93,8 +93,11 @@ class Shopwalk_WC_CDN {
 	 * Returns null if the URL is not a recognised image type or is already
 	 * pointing at the CDN.
 	 *
-	 * Path: merchants/{merchant_id}/{md5(original_url)}.{ext}
-	 * This matches exactly what shopwalk-imgcache writes to R2.
+	 * Path: merchants/{merchant_id}/{md5(original_url)}.{ext}?o={base64url(original_url)}
+	 *
+	 * The R2 key matches exactly what shopwalk-imgcache writes to R2.
+	 * The ?o= param gives the Cloudflare Worker enough info to fetch from origin
+	 * on a cache miss — so images always load even before imgcache has processed them.
 	 *
 	 * @param string $original_url
 	 * @return string|null
@@ -123,7 +126,18 @@ class Shopwalk_WC_CDN {
 		// MD5 of the original URL — must match imgcache's md5.Sum([]byte(sourceURL))
 		$hash = md5( $original_url );
 
-		return sprintf( '%s/merchants/%s/%s%s', self::CDN_BASE, $merchant_id, $hash, $ext );
+		// base64url-encode the original URL for the Worker's origin fallback.
+		// Worker decodes ?o= on R2 miss, fetches from origin, stores in R2, serves.
+		$encoded_origin = rtrim( strtr( base64_encode( $original_url ), '+/', '-_' ), '=' );
+
+		return sprintf(
+			'%s/merchants/%s/%s%s?o=%s',
+			self::CDN_BASE,
+			$merchant_id,
+			$hash,
+			$ext,
+			$encoded_origin
+		);
 	}
 
 	/**
