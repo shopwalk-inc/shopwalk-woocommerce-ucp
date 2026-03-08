@@ -611,11 +611,11 @@ class Shopwalk_WC_Settings {
 				'id'      => 'shopwalk_wc_enable_webhooks',
 				'default' => 'yes',
 			),
-			'enable_cdn'      => array(
-				'name'    => __( 'Enable CDN Image Serving', 'shopwalk-ai' ),
+			'enable_store_boost' => array(
+				'name'    => __( 'Enable Store Boost', 'shopwalk-ai' ),
 				'type'    => 'checkbox',
-				'desc'    => __( 'Serve your product images from the Shopwalk CDN (cdn.shopwalk.com). Images are automatically cached — no configuration needed. Requires your store to be registered with Shopwalk.', 'shopwalk-ai' ),
-				'id'      => 'shopwalk_cdn_enabled',
+				'desc'    => __( 'Serve your product images from the Shopwalk CDN for faster page loads and better Core Web Vitals. Available once all products are synced and images are cached.', 'shopwalk-ai' ),
+				'id'      => 'shopwalk_store_boost_enabled',
 				'default' => 'no',
 			),
 			'section_end'     => array(
