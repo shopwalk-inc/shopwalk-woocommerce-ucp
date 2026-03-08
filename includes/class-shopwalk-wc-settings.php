@@ -54,6 +54,7 @@ class Shopwalk_WC_Settings {
 		add_action( 'wp_ajax_shopwalk_wc_sync_all', array( $this, 'ajax_sync_all' ) );
 		add_action( 'wp_ajax_shopwalk_wc_test_connection', array( $this, 'ajax_test_connection' ) );
 		add_action( 'wp_ajax_shopwalk_auto_register', array( $this, 'ajax_auto_register' ) );
+		add_action( 'wp_ajax_shopwalk_toggle_feature', array( $this, 'ajax_toggle_feature' ) );
 		$this->dashboard = new Shopwalk_WC_Dashboard();
 		add_action( 'wp_ajax_shopwalk_save_manual_key', array( $this, 'ajax_save_manual_key' ) );
 
@@ -291,6 +292,36 @@ class Shopwalk_WC_Settings {
 		flush_rewrite_rules();
 
 		wp_send_json_success( array( 'message' => 'Key saved successfully.' ) );
+	}
+
+	/**
+	 * AJAX: toggle a feature on/off.
+	 */
+	public function ajax_toggle_feature(): void {
+		check_ajax_referer( 'shopwalk_toggle_feature', 'nonce' );
+
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
+
+		$feature = sanitize_text_field( wp_unslash( $_POST['feature'] ?? '' ) );
+		$enabled = isset( $_POST['enabled'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['enabled'] ) );
+
+		// Whitelist of allowed feature options.
+		$allowed_features = array(
+			'shopwalk_feature_search_enabled',
+			'shopwalk_store_boost_enabled',
+			'shopwalk_feature_ai_descriptions_enabled',
+			'shopwalk_feature_ucp_enabled',
+		);
+
+		if ( ! in_array( $feature, $allowed_features, true ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid feature.' ), 400 );
+		}
+
+		update_option( $feature, $enabled ? 1 : 0 );
+
+		wp_send_json_success( array( 'message' => 'Feature toggled successfully.', 'enabled' => $enabled ) );
 	}
 
 	/**
@@ -621,6 +652,54 @@ class Shopwalk_WC_Settings {
 			'section_end'     => array(
 				'type' => 'sectionend',
 				'id'   => 'shopwalk_wc_section_end',
+			),
+			'features_title'  => array(
+				'name' => __( 'Features', 'shopwalk-ai' ),
+				'type' => 'title',
+				'desc' => __( 'Individual feature toggles. Each feature can be independently enabled or disabled.', 'shopwalk-ai' ),
+				'id'   => 'shopwalk_wc_features_title',
+			),
+			'feature_search' => array(
+				'name'    => __( 'Semantic Search', 'shopwalk-ai' ),
+				'type'    => 'checkbox',
+				'desc'    => __( 'AI-powered search overlay on product pages.', 'shopwalk-ai' ),
+				'id'      => 'shopwalk_feature_search_enabled',
+				'default' => '1',
+			),
+			'feature_store_boost_toggle' => array(
+				'name'    => __( 'Store Boost', 'shopwalk-ai' ),
+				'type'    => 'checkbox',
+				'desc'    => __( 'Serve product images via CDN.', 'shopwalk-ai' ),
+				'id'      => 'shopwalk_store_boost_enabled',
+				'default' => '1',
+			),
+			'feature_ai_descriptions' => array(
+				'name'    => __( 'AI Descriptions', 'shopwalk-ai' ),
+				'type'    => 'checkbox',
+				'desc'    => __( 'AI-assisted product copy improvement in the admin.', 'shopwalk-ai' ),
+				'id'      => 'shopwalk_feature_ai_descriptions_enabled',
+				'default' => '1',
+			),
+			'feature_ucp' => array(
+				'name'    => __( 'UCP Discovery', 'shopwalk-ai' ),
+				'type'    => 'checkbox',
+				'desc'    => __( 'AI browsing & checkout API.', 'shopwalk-ai' ),
+				'id'      => 'shopwalk_feature_ucp_enabled',
+				'default' => '1',
+			),
+			'features_end'    => array(
+				'type' => 'sectionend',
+				'id'   => 'shopwalk_wc_features_end',
+			),
+			'search_gaps_title' => array(
+				'name' => __( 'Search Intelligence', 'shopwalk-ai' ),
+				'type' => 'title',
+				'desc' => Shopwalk_WC_Search_Gaps::render(),
+				'id'   => 'shopwalk_wc_search_gaps_title',
+			),
+			'search_gaps_end' => array(
+				'type' => 'sectionend',
+				'id'   => 'shopwalk_wc_search_gaps_end',
 			),
 			'ai_status_title' => array(
 				'name' => __( 'AI Commerce Status', 'shopwalk-ai' ),
