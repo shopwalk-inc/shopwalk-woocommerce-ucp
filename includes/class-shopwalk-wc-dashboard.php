@@ -260,20 +260,27 @@ class Shopwalk_WC_Dashboard {
 				</div>
 			</div>
 
-			<!-- CDN Section -->
+			<!-- Store Boost Section -->
 			<div class="sw-section">
-				<h3><?php esc_html_e( 'Shopwalk CDN — Turbo Boost Images', 'shopwalk-ai' ); ?></h3>
+				<h3><?php esc_html_e( 'Store Boost', 'shopwalk-ai' ); ?></h3>
 				<p style="margin:0 0 16px;font-size:13px;color:#646970;" id="sw-cdn-desc">
 					<?php esc_html_e( 'Serve your product images from Shopwalk\'s global CDN for faster page loads and better Core Web Vitals.', 'shopwalk-ai' ); ?>
 				</p>
 				<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-					<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1d2327;">
-						<input type="checkbox" id="sw-cdn-toggle" style="width:18px;height:18px;cursor:pointer;" <?php echo get_option( 'shopwalk_cdn_enabled', false ) ? 'checked' : ''; ?> />
-						<?php esc_html_e( 'Enable Shopwalk CDN Images', 'shopwalk-ai' ); ?>
+					<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#1d2327;" id="sw-boost-label">
+						<input type="checkbox" id="sw-cdn-toggle" style="width:18px;height:18px;" disabled
+							<?php echo get_option( 'shopwalk_store_boost_enabled', false ) ? 'checked' : ''; ?> />
+						<?php esc_html_e( 'Enable Store Boost', 'shopwalk-ai' ); ?>
 					</label>
 					<span id="sw-cdn-toggle-status" style="font-size:12px;color:#646970;"></span>
 				</div>
-				<p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">
+				<p id="sw-boost-not-ready" style="margin:10px 0 0;font-size:12px;color:#b45309;display:none;">
+					⏳ <?php esc_html_e( 'Store Boost will be available once all your products are synced and images are cached.', 'shopwalk-ai' ); ?>
+				</p>
+				<p id="sw-boost-ready-hint" style="margin:10px 0 0;font-size:12px;color:#9ca3af;display:none;">
+					<?php esc_html_e( 'All images cached. Enable Store Boost to start serving images from the CDN.', 'shopwalk-ai' ); ?>
+				</p>
+				<p style="margin:10px 0 0;font-size:12px;color:#9ca3af;">
 					<?php esc_html_e( 'Verify your speed improvement in Google PageSpeed Insights after enabling.', 'shopwalk-ai' ); ?>
 				</p>
 				<div id="sw-cdn-result" class="sw-inline-result"></div>
@@ -641,12 +648,13 @@ class Shopwalk_WC_Dashboard {
 				$.post(ajaxurl, $.extend({ action: action, nonce: nonce }, extra), cb);
 			}
 
-			/** ---- CDN Stats ---- */
+			/** ---- Store Boost / CDN Stats ---- */
 			function renderCdnStats(d) {
 				var count = d.cdn_image_count || 0;
 				var total = d.cdn_total_images || 0;
 				var savingsMs = d.cdn_savings_ms || 0;
 				var enabled = d.cdn_enabled || false;
+				var boostReady = d.store_boost_ready || false;
 
 				$('#sw-cdn-count').text(count.toLocaleString() + (total > 0 ? ' / ' + total.toLocaleString() : ''));
 
@@ -663,14 +671,28 @@ class Shopwalk_WC_Dashboard {
 					$('#sw-cdn-desc').text('<?php echo esc_js( __( 'Your product images are served from Shopwalk\'s global CDN. Estimated page speed improvement: ', 'shopwalk-ai' ) ); ?>' + savingsMs + 'ms.');
 				}
 
-				// Sync checkbox state
-				$('#sw-cdn-toggle').prop('checked', enabled);
+				// Gate Store Boost toggle: only enable when all images are cached
+				var $toggle = $('#sw-cdn-toggle');
+				$toggle.prop('checked', enabled);
+				if (boostReady || enabled) {
+					$toggle.prop('disabled', false).closest('label').css('cursor', 'pointer');
+					$('#sw-boost-not-ready').hide();
+					if (!enabled && boostReady) {
+						$('#sw-boost-ready-hint').show();
+					} else {
+						$('#sw-boost-ready-hint').hide();
+					}
+				} else {
+					$toggle.prop('disabled', true).closest('label').css('cursor', 'not-allowed');
+					$('#sw-boost-not-ready').show();
+					$('#sw-boost-ready-hint').hide();
+				}
 
 				// Hero body — update with real numbers
 				if (d.product_count > 0 || count > 0) {
 					var parts = [];
 					if (d.product_count > 0) parts.push(d.product_count.toLocaleString() + ' <?php echo esc_js( __( 'products synced', 'shopwalk-ai' ) ); ?>');
-					if (count > 0) parts.push(count.toLocaleString() + ' <?php echo esc_js( __( 'images on CDN', 'shopwalk-ai' ) ); ?>');
+					if (count > 0) parts.push(count.toLocaleString() + ' <?php echo esc_js( __( 'images boosted', 'shopwalk-ai' ) ); ?>');
 					if (savingsMs > 0) parts.push('~' + savingsMs + 'ms <?php echo esc_js( __( 'faster page loads', 'shopwalk-ai' ) ); ?>');
 					if (parts.length > 0) {
 						$('#sw-hero-body').text(parts.join(' · ') + '. <?php echo esc_js( __( 'Upgrade to Pro to add an AI shopping assistant directly to your store.', 'shopwalk-ai' ) ); ?>');
@@ -678,7 +700,7 @@ class Shopwalk_WC_Dashboard {
 				}
 			}
 
-			/** ---- CDN Toggle ---- */
+			/** ---- Store Boost Toggle ---- */
 			$('#sw-cdn-toggle').on('change', function() {
 				var enabled = $(this).prop('checked');
 				var $status = $('#sw-cdn-toggle-status');
@@ -687,13 +709,14 @@ class Shopwalk_WC_Dashboard {
 
 				$.post(ajaxurl, { action: 'shopwalk_cdn_toggle', nonce: nonce, enabled: enabled ? 1 : 0 }, function(resp) {
 					if (resp.success) {
-						$status.text(enabled ? '<?php echo esc_js( __( '✓ CDN enabled', 'shopwalk-ai' ) ); ?>' : '<?php echo esc_js( __( 'CDN disabled', 'shopwalk-ai' ) ); ?>');
+						$status.text(enabled ? '<?php echo esc_js( __( '✓ Store Boost enabled', 'shopwalk-ai' ) ); ?>' : '<?php echo esc_js( __( 'Store Boost disabled', 'shopwalk-ai' ) ); ?>');
+						$('#sw-boost-ready-hint').hide();
 						setTimeout(function() { $status.text(''); }, 3000);
 					} else {
 						$('#sw-cdn-toggle').prop('checked', !enabled); // revert
 						$status.text('');
 						$('#sw-cdn-result').removeClass('success').addClass('error')
-							.text((resp.data && resp.data.message) || '<?php echo esc_js( __( 'Failed to update CDN setting.', 'shopwalk-ai' ) ); ?>').show();
+							.text((resp.data && resp.data.message) || '<?php echo esc_js( __( 'Failed to update Store Boost setting.', 'shopwalk-ai' ) ); ?>').show();
 					}
 				});
 			});
@@ -1062,7 +1085,7 @@ class Shopwalk_WC_Dashboard {
 		}
 
 		// Persist locally so CDN class can read it on page render.
-		update_option( 'shopwalk_cdn_enabled', $enabled );
+		update_option( 'shopwalk_store_boost_enabled', $enabled );
 
 		wp_send_json_success( array( 'message' => $body['message'] ?? 'CDN setting updated.', 'enabled' => $enabled ) );
 	}

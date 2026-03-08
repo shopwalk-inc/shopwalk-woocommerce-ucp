@@ -61,7 +61,7 @@ $options = array(
 	'shopwalk_license_status',
 	'shopwalk_license_refreshed_at',
 	// CDN (v1.8.0).
-	'shopwalk_cdn_enabled',
+	'shopwalk_store_boost_enabled',
 	// Legacy keys (kept for clean migration from older versions).
 	'shopwalk_wc_license_key',
 	'shopwalk_wc_shopwalk_api_key',

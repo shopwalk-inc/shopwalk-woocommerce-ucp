@@ -27,7 +27,7 @@ class Shopwalk_WC_CDN {
 	 * Called from shopwalk_ai_init() after all includes are loaded.
 	 */
 	public static function init(): void {
-		if ( ! get_option( 'shopwalk_cdn_enabled', false ) ) {
+		if ( ! get_option( 'shopwalk_store_boost_enabled', false ) ) {
 			return;
 		}
 
