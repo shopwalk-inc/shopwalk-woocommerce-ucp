@@ -188,7 +188,7 @@ function shopwalk_ai_activate(): void {
  * Attempt to auto-register (or re-register) this store with Shopwalk.
  *
  * Called on activation and retried on admin_init when a previous attempt failed.
- * Idempotent — safe to call multiple times; the API returns the same merchant_id for the same site_url.
+ * Idempotent — safe to call multiple times; the API returns the same partner_id for the same site_url.
  *
  * Supports two channels:
  *  - Pro: define SHOPWALK_REGISTRATION_TOKEN in wp-config.php (included in Pro zip)
@@ -198,7 +198,7 @@ function shopwalk_ai_activate(): void {
  */
 function shopwalk_ai_auto_register(): bool {
 	// Already registered — nothing to do.
-	if ( ! empty( get_option( 'shopwalk_merchant_id', '' ) ) ) {
+	if ( ! empty( get_option( 'shopwalk_partner_id', '' ) ) ) {
 		delete_transient( 'shopwalk_wc_needs_registration' );
 		return true;
 	}
@@ -231,13 +231,13 @@ function shopwalk_ai_auto_register(): bool {
 	$code = wp_remote_retrieve_response_code( $response );
 	$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-	if ( 200 !== $code || empty( $body['merchant_id'] ) ) {
+	if ( 200 !== $code || empty( $body['partner_id'] ) ) {
 		set_transient( 'shopwalk_wc_needs_registration', 1, DAY_IN_SECONDS );
 		return false;
 	}
 
 	// Store new license model fields.
-	update_option( 'shopwalk_merchant_id', $body['merchant_id'] );
+	update_option( 'shopwalk_partner_id', $body['partner_id'] );
 	update_option( 'shopwalk_license_level', $body['license_level'] ?? 'free' );
 	update_option( 'shopwalk_license_status', $body['license_status'] ?? 'active' );
 	update_option( 'shopwalk_license_refreshed_at', gmdate( 'c' ) );

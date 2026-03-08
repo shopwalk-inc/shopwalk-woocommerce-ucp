@@ -428,8 +428,8 @@ class Shopwalk_WC_Products {
 
 	/**
 	 * Submit Review Endpoint.
-	 * Allows Shopwalk users to post a review to the merchant's WooCommerce store.
-	 * Review is held for merchant moderation (comment_status = 'hold').
+	 * Allows Shopwalk users to post a review to the partner's WooCommerce store.
+	 * Review is held for partner moderation (comment_status = 'hold').
 	 * Protected by Inbound API Key (Authorization: Bearer <key>).
 	 *
 	 * @param WP_REST_Request $request Parameter.
@@ -457,7 +457,7 @@ class Shopwalk_WC_Products {
 			return new WP_Error( 'not_found', 'Product not found', array( 'status' => 404 ) );
 		}
 
-		// Create the WC review (as a comment), held for merchant moderation.
+		// Create the WC review (as a comment), held for partner moderation.
 		$comment_data = array(
 			'comment_post_ID'      => $product_id,
 			'comment_author'       => $author_name,

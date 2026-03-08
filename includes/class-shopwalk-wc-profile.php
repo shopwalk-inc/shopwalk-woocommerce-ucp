@@ -66,7 +66,7 @@ class Shopwalk_WC_Profile {
 						'id'      => 'shopwalk_pay',
 						'version' => '2026-01-23',
 						'config'  => array(
-							'merchant_id' => self::get_merchant_id(),
+							'partner_id' => self::get_partner_id(),
 						),
 					),
 				),
@@ -78,10 +78,10 @@ class Shopwalk_WC_Profile {
 	}
 
 	/**
-	 * Return the merchant ID (option or site-URL derived).
+	 * Return the partner ID (option or site-URL derived).
 	 */
-	public static function get_merchant_id(): string {
-		$configured = get_option( 'shopwalk_wc_merchant_id', '' );
+	public static function get_partner_id(): string {
+		$configured = get_option( 'shopwalk_wc_partner_id', '' );
 		if ( ! empty( $configured ) ) {
 			return $configured;
 		}

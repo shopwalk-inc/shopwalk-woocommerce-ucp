@@ -16,8 +16,8 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 // ── Purge all store data from Shopwalk before clearing WP options ──────────
-// Deactivation = soft-delete (merchant hidden, restorable).
-// Deletion (this file) = hard purge — merchant, products, and license removed permanently.
+// Deactivation = soft-delete (partner hidden, restorable).
+// Deletion (this file) = hard purge — partner, products, and license removed permanently.
 $_sw_plugin_key = get_option( 'shopwalk_wc_plugin_key', '' );
 $_sw_site_url   = get_option( 'siteurl', home_url() );
 
@@ -56,7 +56,7 @@ $options = array(
 	// Webhooks registry.
 	'shopwalk_wc_webhooks',
 	// License model (v1.7.0).
-	'shopwalk_merchant_id',
+	'shopwalk_partner_id',
 	'shopwalk_license_level',
 	'shopwalk_license_status',
 	'shopwalk_license_refreshed_at',

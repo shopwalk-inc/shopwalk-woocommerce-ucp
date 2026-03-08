@@ -129,11 +129,11 @@ class Shopwalk_WC_Sync {
 	}
 
 	/**
-	 * Get the merchant ID.
+	 * Get the partner ID.
 	 * Uses the configured option, or auto-derives from the site URL.
 	 */
-	protected function get_merchant_id(): string {
-		$configured = get_option( 'shopwalk_wc_merchant_id', '' );
+	protected function get_partner_id(): string {
+		$configured = get_option( 'shopwalk_wc_partner_id', '' );
 		if ( ! empty( $configured ) ) {
 			return $configured;
 		}
@@ -356,7 +356,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.delete',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id' => (string) $product_id,
 			),
@@ -393,7 +393,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.delete',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id' => (string) $post_id,
 			),
@@ -446,7 +446,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.stock_update',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id'    => (string) $product_id,
 				'in_stock'       => ( 'instock' === $status ),
@@ -484,7 +484,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.stock_update',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id'    => (string) $product->get_id(),
 				'in_stock'       => ( 'instock' === $status ),
@@ -528,7 +528,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.price_update',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id'      => (string) $product->get_id(),
 				'base_price'       => ( $on_sale && '' !== $sale_price ) ? (float) $sale_price : $regular_price,
@@ -569,7 +569,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.coupon_update',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'coupon'      => array(
 				'id'            => (string) $coupon_id,
 				'code'          => $coupon->get_code(),
@@ -610,7 +610,7 @@ class Shopwalk_WC_Sync {
 		$payload = array(
 			'event_type'  => 'product.coupon_update',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'coupon'      => array(
 				'id'     => (string) $coupon_id,
 				'code'   => $code,
@@ -719,7 +719,7 @@ class Shopwalk_WC_Sync {
 		return array(
 			'event_type'  => 'product.upsert',
 			'source'      => 'plugin',
-			'merchant_id' => $this->get_merchant_id(),
+			'partner_id' => $this->get_partner_id(),
 			'product'     => array(
 				'external_id'       => (string) $product->get_id(),
 				'provider'          => 'woocommerce',

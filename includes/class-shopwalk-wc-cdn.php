@@ -5,10 +5,10 @@
  * Rewrites WooCommerce product image URLs to the Shopwalk CDN when enabled.
  *
  * Path scheme (must match shopwalk-imgcache):
- *   https://cdn.shopwalk.com/merchants/{merchant_id}/{md5(original_url)}.{ext}
+ *   https://cdn.shopwalk.com/partners/{partner_id}/{md5(original_url)}.{ext}
  *
  * The imgcache service caches images at this exact path in R2 when it processes
- * merchant_product_image messages. We compute the same MD5 locally — no API call needed.
+ * partner_product_image messages. We compute the same MD5 locally — no API call needed.
  *
  * @package ShopwalkAI
  * @since   1.8.0
@@ -31,9 +31,9 @@ class Shopwalk_WC_CDN {
 			return;
 		}
 
-		$merchant_id = get_option( 'shopwalk_merchant_id', '' );
-		if ( empty( $merchant_id ) ) {
-			// Store not registered yet — CDN can't work without a merchant ID.
+		$partner_id = get_option( 'shopwalk_partner_id', '' );
+		if ( empty( $partner_id ) ) {
+			// Store not registered yet — CDN can't work without a partner ID.
 			return;
 		}
 
@@ -93,7 +93,7 @@ class Shopwalk_WC_CDN {
 	 * Returns null if the URL is not a recognised image type, is already
 	 * pointing at the CDN, or is not in the confirmed-cached list.
 	 *
-	 * Path: merchants/{merchant_id}/{md5(original_url)}.{ext}?o={base64url(original_url)}
+	 * Path: partners/{partner_id}/{md5(original_url)}.{ext}?o={base64url(original_url)}
 	 *
 	 * The R2 key matches exactly what shopwalk-imgcache writes to R2.
 	 * The ?o= param gives the Cloudflare Worker enough info to fetch from origin
@@ -120,8 +120,8 @@ class Shopwalk_WC_CDN {
 			return null;
 		}
 
-		$merchant_id = get_option( 'shopwalk_merchant_id', '' );
-		if ( empty( $merchant_id ) ) {
+		$partner_id = get_option( 'shopwalk_partner_id', '' );
+		if ( empty( $partner_id ) ) {
 			return null;
 		}
 
@@ -139,9 +139,9 @@ class Shopwalk_WC_CDN {
 		$encoded_origin = rtrim( strtr( base64_encode( $original_url ), '+/', '-_' ), '=' );
 
 		return sprintf(
-			'%s/merchants/%s/%s%s?o=%s',
+			'%s/partners/%s/%s%s?o=%s',
 			self::CDN_BASE,
-			$merchant_id,
+			$partner_id,
 			$hash,
 			$ext,
 			$encoded_origin

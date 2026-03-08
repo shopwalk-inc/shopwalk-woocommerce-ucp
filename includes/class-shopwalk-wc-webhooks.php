@@ -196,7 +196,7 @@ class Shopwalk_WC_Webhooks {
 		$headers = array(
 			'Content-Type'           => 'application/json',
 			'X-API-Key'              => $plugin_key,
-			'X-Shopwalk-Merchant-ID' => Shopwalk_WC_Profile::get_merchant_id(),
+			'X-Shopwalk-Partner-ID' => Shopwalk_WC_Profile::get_partner_id(),
 			'UCP-Agent'              => 'profile="' . home_url( '/.well-known/ucp' ) . '"',
 			'X-Event-ID'             => $payload['event_id'] ?? '',
 		);

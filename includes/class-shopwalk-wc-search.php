@@ -47,10 +47,10 @@ class Shopwalk_WC_Search {
 			return;
 		}
 
-		$merchant_id = get_option( 'shopwalk_merchant_id', '' );
+		$partner_id = get_option( 'shopwalk_partner_id', '' );
 		$api_key     = get_option( 'shopwalk_wc_plugin_key', '' );
 
-		if ( empty( $merchant_id ) || empty( $api_key ) ) {
+		if ( empty( $partner_id ) || empty( $api_key ) ) {
 			return;
 		}
 
@@ -79,7 +79,7 @@ class Shopwalk_WC_Search {
 			array(
 				'apiUrl'          => 'https://api.shopwalk.com/api/v1/plugin/search',
 				'apiKey'          => $api_key,
-				'merchantId'      => $merchant_id,
+				'partnerId'      => $partner_id,
 				'popularProducts' => $popular_products,
 			)
 		);
@@ -182,9 +182,9 @@ class Shopwalk_WC_Search {
 	 */
 	public function do_heartbeat(): void {
 		$api_key = get_option( 'shopwalk_wc_plugin_key', '' );
-		$merchant_id = get_option( 'shopwalk_merchant_id', '' );
+		$partner_id = get_option( 'shopwalk_partner_id', '' );
 
-		if ( empty( $api_key ) || empty( $merchant_id ) ) {
+		if ( empty( $api_key ) || empty( $partner_id ) ) {
 			return;
 		}
 

@@ -183,15 +183,15 @@ class Shopwalk_WC_Settings {
 		// Store the key and activate.
 		update_option( 'shopwalk_wc_plugin_key', $body['api_key'] );
 		update_option( 'shopwalk_wc_license_status', 'active' );
-		if ( ! empty( $body['merchant_id'] ) ) {
-			update_option( 'shopwalk_wc_merchant_id', $body['merchant_id'] );
+		if ( ! empty( $body['partner_id'] ) ) {
+			update_option( 'shopwalk_wc_partner_id', $body['partner_id'] );
 		}
 		flush_rewrite_rules();
 
 		wp_send_json_success(
 			array(
 				'message'     => 'Your store is now connected to Shopwalk AI!',
-				'merchant_id' => $body['merchant_id'] ?? '',
+				'partner_id' => $body['partner_id'] ?? '',
 				'registered'  => $body['registered'] ?? true,
 			)
 		);
@@ -596,11 +596,11 @@ class Shopwalk_WC_Settings {
 				'desc_tip'    => true,
 				'placeholder' => 'sw_plugin_...',
 			),
-			'merchant_id'     => array(
-				'name'        => __( 'Merchant ID', 'shopwalk-ai' ),
+			'partner_id'     => array(
+				'name'        => __( 'Partner ID', 'shopwalk-ai' ),
 				'type'        => 'text',
-				'desc'        => __( 'Override the merchant slug sent to Shopwalk. Leave blank to auto-derive from your site URL. Useful if the auto-derived ID does not match your Shopwalk dashboard.', 'shopwalk-ai' ),
-				'id'          => 'shopwalk_wc_merchant_id',
+				'desc'        => __( 'Override the partner slug sent to Shopwalk. Leave blank to auto-derive from your site URL. Useful if the auto-derived ID does not match your Shopwalk dashboard.', 'shopwalk-ai' ),
+				'id'          => 'shopwalk_wc_partner_id',
 				'default'     => '',
 				'desc_tip'    => true,
 				'placeholder' => __( 'Auto (derived from site URL)', 'shopwalk-ai' ),

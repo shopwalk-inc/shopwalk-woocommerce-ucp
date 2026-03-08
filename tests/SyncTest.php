@@ -169,7 +169,7 @@ class SyncTest extends TestCase {
 				json_encode(
 					array(
 						'event_type'  => 'product.upsert',
-						'merchant_id' => 'test',
+						'partner_id' => 'test',
 						'product'     => array( 'external_id' => '42' ),
 					)
 				)

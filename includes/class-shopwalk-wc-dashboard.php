@@ -1,6 +1,6 @@
 <?php
 /**
- * Shopwalk AI — Merchant Dashboard
+ * Shopwalk AI — Partner Dashboard
  *
  * Shows store health, products indexed, AI agent activity, subscription info, and self-service tools.
  *
@@ -359,7 +359,7 @@ class Shopwalk_WC_Dashboard {
 			<div class="sw-modal">
 				<button class="sw-close-btn" id="sw-migrate-close">✕</button>
 				<h3><?php esc_html_e( 'I Moved My Site', 'shopwalk-ai' ); ?></h3>
-				<p><?php esc_html_e( 'Enter the new URL for this store. This updates your Shopwalk merchant binding so your catalog and license follow the new domain.', 'shopwalk-ai' ); ?></p>
+				<p><?php esc_html_e( 'Enter the new URL for this store. This updates your Shopwalk partner binding so your catalog and license follow the new domain.', 'shopwalk-ai' ); ?></p>
 				<input type="url" id="sw-migrate-domain" placeholder="https://newdomain.com" />
 				<div class="sw-modal-actions">
 					<button type="button" class="sw-btn sw-btn-secondary" id="sw-migrate-cancel-btn">
@@ -1039,13 +1039,13 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $license_ok ? null : __( 'Deactivate and reactivate the plugin to refresh your license, or contact support@shopwalk.com.', 'shopwalk-ai' ),
 		);
 
-		// Merchant ID set.
-		$merchant_id = (string) get_option( 'shopwalk_merchant_id', '' );
-		$mid_ok      = ! empty( $merchant_id );
+		// Partner ID set.
+		$partner_id = (string) get_option( 'shopwalk_partner_id', '' );
+		$mid_ok      = ! empty( $partner_id );
 		$checks[]    = array(
-			'name'  => __( 'Merchant ID', 'shopwalk-ai' ),
+			'name'  => __( 'Partner ID', 'shopwalk-ai' ),
 			'ok'    => $mid_ok,
-			'value' => $mid_ok ? substr( $merchant_id, 0, 8 ) . '…' : __( 'Not set', 'shopwalk-ai' ),
+			'value' => $mid_ok ? substr( $partner_id, 0, 8 ) . '…' : __( 'Not set', 'shopwalk-ai' ),
 			'fix'   => $mid_ok ? null : __( 'Deactivate and reactivate the plugin to trigger auto-registration.', 'shopwalk-ai' ),
 		);
 
