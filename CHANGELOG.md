@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Version
 
 ---
 
+## [1.13.0] — 2026-03-09
+
+### Changed
+- Free plugin streamlined to core features only: UCP discovery + Store Boost (R2 image CDN)
+- Removed semantic search overlay, AI description assistant, and search intelligence teaser from free tier
+
+### Removed
+- `class-shopwalk-wc-search.php` — semantic search overlay (Pro feature)
+- `class-shopwalk-wc-ai-assist.php` — AI product description improvement (Pro feature)
+- `class-shopwalk-wc-search-gaps.php` — search gap intelligence (Pro feature)
+- `assets/js/shopwalk-search.js`, `assets/css/shopwalk-search.css`
+
+---
+
 ## [1.1.0] — 2026-02-25
 
 ### Added
