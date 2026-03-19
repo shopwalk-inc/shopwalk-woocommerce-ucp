@@ -1,254 +1,180 @@
-=== Shopwalk AI for WooCommerce ===
+=== Shopwalk for WooCommerce ===
 Contributors: shopwalkinc
-Tags: woocommerce, ai, search, ecommerce, product-sync
+Tags: woocommerce, ai, ucp, ai-commerce, product-sync
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
 Stable tag: 1.13.0
+WC requires at least: 8.0
 WC tested up to: 10.5
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-enable your WooCommerce store in minutes. Let AI agents discover, browse, and buy from your store automatically.
+Make your WooCommerce store ready for AI agent commerce. Implements the Universal Commerce Protocol (UCP) — the open standard co-developed by Google, Shopify, Etsy, Wayfair, Target, and Walmart.
 
 == Description ==
 
-**Shopwalk AI** makes your WooCommerce store visible and accessible to AI shopping agents. Activate the plugin and your store is instantly open to AI-powered discovery — no developer required, no license key needed.
+**Shopwalk for WooCommerce** is the official WooCommerce implementation of the [Universal Commerce Protocol (UCP)](https://ucp.dev) — an open industry standard for AI agent commerce, co-developed and adopted by **Google, Shopify, Etsy, Wayfair, Target, and Walmart**.
 
-This plugin is the **first and most complete Universal Commerce Protocol (UCP) server** implementation for WooCommerce. It exposes a full UCP-compliant REST API so any AI agent can autonomously browse your catalog, check stock, create checkout sessions, apply coupons, place orders, and track fulfillment — all without leaving your WooCommerce store.
+UCP defines how AI agents safely discover stores, browse catalogs, create checkout sessions, and place orders — built on REST, OAuth 2.0, and the Agent Payments Protocol (AP2). It's the common language the world's largest commerce platforms agreed on for the agentic commerce era.
 
-= What It Does =
+Install this plugin and your WooCommerce store speaks that language.
 
-Modern shoppers increasingly use AI to find and buy products. Shopwalk AI bridges the gap between your WooCommerce store and the AI commerce layer, so your products surface in AI-driven search results and AI agents can complete purchases on behalf of shoppers.
+= Why This Matters =
+
+AI assistants — built on Claude, GPT, Gemini, and every other major platform — are starting to shop on behalf of users. When they need to buy something, they use UCP to find stores, check products, and complete purchases. Without UCP, your store is invisible to them.
+
+This plugin adds full UCP compliance to your WooCommerce store in one click.
+
+= The Shopwalk Trust Layer =
+
+Many hosting providers (Bluehost, WP Engine, Kinsta, and others) block bot traffic at the WAF level — which includes AI agent requests. Shopwalk acts as a trusted intermediary:
+
+1. Your plugin maintains a trusted, authenticated channel to Shopwalk
+2. AI agents interact with your store through the Shopwalk API
+3. Shopwalk forwards requests as a trusted partner your host already allows through
+4. Your store processes orders through WooCommerce as normal
+
+No firewall changes. No IP whitelisting. Just works.
 
 = Features =
 
-* **Automatic registration** — Activate the plugin and your store is registered with Shopwalk automatically. No license key entry required.
-* **Automatic product sync** — Your entire catalog syncs to Shopwalk automatically. New products, price changes, and inventory updates propagate in real time.
-* **AI discovery** — Your products surface in AI-powered searches. Shopwalk AI understands natural language and context to connect the right shoppers with your store.
-* **AI browsing (Catalog API)** — AI agents can browse your full catalog via a structured REST API with filtering by category, price range, and stock status.
-* **Product availability API** — Real-time stock and pricing endpoint for every product and variant, used by AI agents before adding to cart.
-* **AI checkout** — AI agents create checkout sessions and place orders directly through your WooCommerce store using the Universal Commerce Protocol (UCP). No redirects, no middleman, no transaction fees.
-* **Coupon / promotion code support** — AI agents can apply and remove WooCommerce coupon codes during checkout sessions.
-* **Order status & tracking** — Full order status endpoint with UCP-standardized statuses and shipment tracking number support.
-* **Refund API** — AI agents can initiate partial or full refunds programmatically.
-* **Guest checkout assurance** — Shopwalk sessions always work as guest checkouts, even if your store has Require account enabled.
-* **Session expiry** — Checkout sessions automatically expire after 24 hours for security.
-* **Order webhooks** — Real-time order status notifications keep AI agents in sync with your fulfillment workflow.
-* **UCP discovery** — `/.well-known/ucp` endpoint broadcasts your store's full UCP capabilities to any AI agent.
-* **Partner dashboard** — See products indexed, AI agent request count, UCP health, subscription status, and self-service tools directly in WP Admin.
-* **Upgrade / downgrade in-place** — Manage your Shopwalk Pro subscription without leaving WP Admin.
+* **One-click setup** — Activate the plugin and your store registers automatically. No account creation, no license key entry required.
+* **Real-time product sync** — Your catalog syncs to Shopwalk automatically. New products, price changes, and inventory updates propagate instantly.
+* **AI discovery** — Your products appear in Shopwalk AI searches across the network.
+* **UCP Catalog API** — AI agents can browse your full catalog via structured endpoints with filters for category, price, and stock.
+* **UCP Availability API** — Real-time stock and pricing for every product and variant.
+* **UCP Checkout** — AI agents create checkout sessions and place orders through your WooCommerce store — no redirects, no transaction fees, no middleman.
+* **Coupon support** — AI agents can apply and remove WooCommerce coupon codes during checkout.
+* **Order status & tracking** — Full order status with UCP-standardized statuses and shipment tracking.
+* **Refund API** — AI agents can initiate partial or full refunds.
+* **UCP discovery** — `/.well-known/ucp` announces your store's capabilities to any UCP-compatible agent.
+* **Guest checkout assurance** — UCP sessions always work as guest checkouts.
+* **Admin dashboard** — See sync status, AI request count, UCP health, and manage settings from WP Admin.
+* **No per-sale fees** — Ever.
 
 = Getting Started =
 
 1. Install and activate the plugin
 2. Your store registers with Shopwalk automatically
 3. Products begin syncing immediately
-4. View your dashboard at **WooCommerce → Shopwalk**
+4. View status at **WooCommerce → Shopwalk**
 
 = UCP Endpoints =
 
-All endpoints are available at both `/wp-json/shopwalk/v1/` (UCP standard) and `/wp-json/shopwalk-wc/v1/` (legacy).
+All endpoints follow the [UCP specification](https://ucp.dev/latest/specification/). Available at `/wp-json/shopwalk/v1/`:
 
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `/products` | GET | Public | Paginated catalog with filters |
-| `/products/{id}` | GET | Public | Single product detail |
-| `/products/{id}/availability` | GET | Public | Real-time stock & pricing |
-| `/categories` | GET | Public | Product categories |
-| `/checkout-sessions` | POST | Key | Create checkout session |
-| `/checkout-sessions/{id}` | GET | Key | Get session state |
-| `/checkout-sessions/{id}` | PUT | Key | Update session (buyer, address, coupons) |
-| `/checkout-sessions/{id}/complete` | POST | Key | Place the order |
-| `/checkout-sessions/{id}/cancel` | POST | Key | Cancel session |
-| `/checkout-sessions/{id}/shipping-options` | GET | Key | Available shipping methods |
-| `/orders/{id}` | GET | Key | Order status & tracking |
-| `/orders/{id}/refund` | POST | Key | Issue refund |
-| `/webhooks` | POST | Key | Register webhook URL |
+* `GET /products` — Paginated catalog with filters
+* `GET /products/{id}` — Single product detail
+* `GET /products/{id}/availability` — Real-time stock & pricing
+* `GET /categories` — Product categories
+* `POST /checkout-sessions` — Create UCP checkout session
+* `GET|PUT /checkout-sessions/{id}` — Get or update session
+* `POST /checkout-sessions/{id}/complete` — Place order
+* `GET /orders/{id}` — Order status & tracking
+* `POST /orders/{id}/refund` — Initiate refund
+* `GET /.well-known/ucp` — UCP discovery manifest
+
+= About UCP =
+
+The Universal Commerce Protocol is an open standard licensed under Apache 2.0. Learn more at [ucp.dev](https://ucp.dev) or view the source at [github.com/Universal-Commerce-Protocol/ucp](https://github.com/Universal-Commerce-Protocol/ucp).
+
+Shopwalk is an independent implementation of UCP — not affiliated with the UCP Authors or its co-developers.
+
+== Installation ==
+
+= From the WordPress Plugin Directory =
+
+1. Go to **Plugins → Add New** in your WordPress admin
+2. Search for **Shopwalk**
+3. Click **Install Now**, then **Activate**
+4. Go to **WooCommerce → Shopwalk** — setup is automatic
+
+= Manual Installation =
+
+1. Download the latest zip from the [GitHub releases page](https://github.com/shopwalk-inc/shopwalk-woocommerce-ucp/releases)
+2. Go to **Plugins → Add New → Upload Plugin**
+3. Upload the zip and activate
+4. Go to **WooCommerce → Shopwalk** to verify
+
+== Frequently Asked Questions ==
+
+= Is this really free? =
+Yes. The plugin is free, the Shopwalk integration is free, and there are no per-sale fees — ever.
+
+= Does Shopwalk take a cut of my sales? =
+No. Orders are placed through your WooCommerce store. Shopwalk has no visibility into your revenue.
+
+= What is UCP? =
+The Universal Commerce Protocol (UCP) is an open standard for AI agent commerce, co-developed by Google, Shopify, Etsy, Wayfair, Target, and Walmart. It defines how AI agents discover stores, browse products, and complete purchases. See [ucp.dev](https://ucp.dev).
+
+= My hosting provider blocks bot traffic. Will AI agents be able to reach my store? =
+Yes. The Shopwalk trust layer handles this automatically. AI agents transact through Shopwalk's trusted channel — your host sees a known Shopwalk request, not an anonymous bot. No configuration required on your end.
+
+= What data does this plugin send to Shopwalk? =
+Product name, description, price, stock status, images, categories, and permalink. No customer data — names, addresses, and payment information never leave your WooCommerce store. See the External Services section below.
+
+= Can I use the UCP endpoints without syncing to Shopwalk? =
+Yes. Set an Inbound API Key in the plugin settings and disable sync. Your store becomes a standalone UCP server — any UCP-compatible agent can transact directly, but your products won't appear in Shopwalk AI search results.
+
+= Does it work with WooCommerce HPOS? =
+Yes. Full High-Performance Order Storage compatibility is declared.
+
+= Will it affect my store's frontend or performance? =
+No. The plugin is entirely server-side — no scripts, no styles, no frontend changes. Minimal performance impact.
+
+= Does it work with my theme? =
+Yes. The plugin adds no frontend UI to your store. Fully theme-agnostic.
 
 == External Services ==
 
 This plugin communicates with the **Shopwalk API** (https://api.shopwalk.com) for the following purposes:
 
 **On activation:**
-Sends your site URL, WordPress version, and WooCommerce version to register your store and obtain a partner ID. No account creation or license key is required.
+Registers your store to obtain a free partner ID.
 Data sent: `site_url`, `wp_version`, `wc_version`
 
-**On product save / update:**
-Sends product data to Shopwalk for AI indexing so your products appear in AI-powered search results.
-Data sent: product name, description, price, SKU, stock status, images, categories.
+**On product save/delete:**
+Syncs product catalog data to Shopwalk.
+Data sent: product name, description, price, stock status, images, categories, permalink.
 
-**On order status change (webhooks):**
-Sends order status updates to Shopwalk when orders placed via AI checkout change status (e.g. pending → processing → completed).
-Data sent: order ID, UCP status, tracking number (if available). No customer personal data is included.
+**Periodically (via WP-Cron):**
+Checks license status and plugin update availability.
+Data sent: site URL, current plugin version.
 
-**Hourly (license refresh):**
-Checks your current license level (Free or Pro) from the Shopwalk API using your site URL as the identifier. No personal data is sent.
+**On plugin deletion:**
+Notifies Shopwalk to purge your store's data.
+Data sent: `plugin_key`, `site_url`
 
-**On plugin update checks:**
-Periodically checks for plugin updates via the Shopwalk update API.
-Data sent: current plugin version, site URL.
+**No customer personal data is ever sent to Shopwalk.** Customer names, addresses, and payment information never leave your WooCommerce store. All payment processing and order management remains entirely within WooCommerce.
 
-No customer personal data (names, addresses, payment information) is ever sent to Shopwalk. All payment processing and order management remains entirely within your WooCommerce store.
-
-* Shopwalk Terms of Service: https://shopwalk.com/terms
-* Shopwalk Privacy Policy: https://shopwalk.com/privacy
-
-== Installation ==
-
-1. Upload the `shopwalk-ai` folder to `/wp-content/plugins/`
-2. Activate the plugin through **Plugins → Installed Plugins**
-3. Your store is registered automatically — no license key required
-4. Go to **WooCommerce → Shopwalk** to view your dashboard
-
-== Frequently Asked Questions ==
-
-= Do I need to create an account or enter a license key? =
-
-No. Activating the plugin registers your store with Shopwalk automatically. Your dashboard is available immediately at WooCommerce → Shopwalk.
-
-= What products get synced? =
-
-All published WooCommerce products including simple, variable, and grouped products. Draft and private products are not synced.
-
-= How often does the catalog sync? =
-
-Products sync in real time when created or updated. You can also trigger a full manual sync from the plugin dashboard.
-
-= Does Shopwalk take a commission on sales? =
-
-No. AI agents complete purchases through your own WooCommerce checkout. Shopwalk does not sit in the payment flow and does not charge transaction fees.
-
-= What is the Universal Commerce Protocol (UCP)? =
-
-UCP is an open protocol that lets AI agents interact with e-commerce stores in a structured way — browsing products, checking availability, creating checkout sessions, applying coupons, placing orders, and requesting refunds. This plugin implements a full UCP server on your WooCommerce store.
-
-= Is my customer data shared with Shopwalk? =
-
-No. Only product catalog data is sent to Shopwalk. Customer names, addresses, and payment information never leave your WooCommerce store. See the External Services section for full details.
-
-= Does this work with WooCommerce High-Performance Order Storage (HPOS)? =
-
-Yes. Shopwalk AI is fully compatible with WooCommerce HPOS (Custom Order Tables).
-
-= Does this work with stores that require account registration? =
-
-Yes. Shopwalk AI automatically bypasses the require account setting for AI-initiated orders, allowing guest checkout to always work.
-
-= What happens if my site can't reach the Shopwalk API? =
-
-The plugin degrades gracefully. Your WooCommerce store continues operating normally. Product sync and AI discovery will resume automatically when connectivity is restored. Run Diagnostics in the dashboard to troubleshoot.
-
-= How do I upgrade to Shopwalk Pro? =
-
-Click **Upgrade to Pro** in the Shopwalk dashboard (WooCommerce → Shopwalk). Pro adds an AI shopping assistant page, AI-powered chat widget, and AI content improvement tools. Learn more at https://shopwalk.com/pro
-
-= Can I move my store to a new domain? =
-
-Yes. Use the **I moved my site** tool in the Shopwalk dashboard to update your domain binding. Your catalog and subscription follow the new domain automatically.
+* [Shopwalk Privacy Policy](https://shopwalk.com/privacy)
+* [Shopwalk Terms of Service](https://shopwalk.com/terms)
 
 == Screenshots ==
 
-1. The Shopwalk dashboard in WP Admin — shows products indexed, AI agent requests, UCP health, and subscription status.
-2. Self-service tools — upgrade, downgrade, cancel, migrate domain, and run diagnostics without contacting support.
+1. **WooCommerce → Shopwalk dashboard** — sync status, AI request count, and UCP health at a glance.
+2. **Settings page** — configure sync, catalog API, checkout API, and inbound API key.
+3. **UCP status panel** — live check of all UCP endpoints on your store.
 
 == Changelog ==
 
+= 1.13.0 =
+* Updated all documentation to reflect UCP as the open industry standard (co-developed by Google, Shopify, Etsy, Wayfair, Target, Walmart)
+* Clarified Shopwalk's role as a trusted implementation and hosting trust layer
+* Minor cleanup
+
 = 1.12.0 =
-* docs: Rename "merchant" to "partner" in documentation and user-facing text
-
-= 1.11.0 =
-* feat: Semantic search overlay with AI-powered product discovery
-* feat: AI description improvement with SSE streaming
-* feat: Search gap teaser (static)
-* feat: Individual feature toggles (search, store boost, AI descriptions, UCP)
-* feat: 15-minute heartbeat for Store Boost cache freshness
-* fix: Corrected API URL for search endpoint
-
-= 1.10.0 =
-* Feature: CDN origin fallback — images load immediately via Cloudflare Worker even before imgcache has processed them
-* CDN URLs now include ?o= param (base64url-encoded original URL) for Worker origin fetch on R2 miss
-
-= 1.9.0 =
-* Feature: CDN image rewriting — product images served from cdn.shopwalk.com (enable in Settings > Advanced)
-* Path scheme: partners/{partner_id}/md5({url}).{ext} — deterministic, zero API calls
-* Hooks wp_get_attachment_url, wp_get_attachment_image_src, wp_calculate_image_srcset
-
-= 1.8.0 =
-* Safety: plugin catches fatal errors on boot, deactivates gracefully — wp-admin never goes down
-* Feature: CDN image serving (feature-flagged off by default)
-* Fix: Shopwalk_WC_Dashboard initialisation moved into Settings class
-* Bump: version constants and stable tag aligned to 1.8.0
-
-= 1.7.0 =
-* NEW: Server-side license model — license level (Free/Pro) is checked from Shopwalk API using domain; no license key stored locally
-* NEW: Hourly license refresh via WP-Cron — `shopwalk_license_refresh` event keeps license status current
-* NEW: `shopwalk_is_pro()` helper function for use by Shopwalk Pro plugin
-* NEW: Self-service dashboard — upgrade, downgrade, cancel, undo cancel, migrate domain, Stripe portal, and diagnostics from WP Admin
-* NEW: Domain migration tool — updates partner binding when moving to a new domain
-* NEW: Diagnostics panel — checks PHP version, WC version, WP version, memory limit, API connectivity, UCP endpoint, license status, and partner ID
-* IMPROVED: Auto-registration is now idempotent — safe to call multiple times; re-registers if partner was soft-deleted
-* IMPROVED: Registration payload now includes `registration_token` when `SHOPWALK_REGISTRATION_TOKEN` is defined (used by Pro downloads)
-
-= 1.6.0 =
-* NEW: Partner dashboard page in WP Admin (WooCommerce → Shopwalk)
-* NEW: Dashboard shows products indexed, AI agent request count, UCP health status, and plugin version
-* NEW: Dashboard data cached for 5 minutes to avoid unnecessary API calls
-* NEW: API tracks `ucp_request_count` and `ucp_last_request_at` per partner
-
-= 1.5.0 =
-* NEW: Auto-register store on plugin activation — no manual setup required
-* NEW: Transient-based retry — if registration fails on activation, retries silently on next `admin_init`
-* NEW: Deactivation hook notifies Shopwalk API so feeds pause immediately (non-blocking, fire-and-forget)
-* IMPROVED: Partner soft-delete on deactivation — data preserved, restored on re-activation
-
-= 1.4.0 =
-* FIX: Webhooks class uses WC hooks instead of REST routes — must be instantiated in `init_hooks()`
-* FIX: Removed erroneous `register_routes()` call that caused fatal error on PHP 8.x
-* FIX: Bulk sync rate-limited to 25 products per batch to avoid timeouts
-* FIX: Double-delete prevented by `static $deleted_this_request` guard
-* FIX: WP-Cron used for sync queue flush instead of inline execution
-* FIX: 401 responses from UCP endpoint no longer added to retry queue
-
-= 1.3.0 =
-* Added UCP review submission endpoint — Shopwalk users can now post reviews to partner stores
-
-= 1.2.0 =
-* Added product ratings and review count to sync payload
-* Added UCP reviews endpoint for Shopwalk to fetch product reviews
+* CDN Store Boost improvements
+* Heartbeat reliability fixes
 
 = 1.1.0 =
-* NEW: Product Availability endpoint (`GET /products/{id}/availability`) — real-time stock, pricing, and variant availability
-* NEW: Catalog endpoint enhancements — added `min_price`, `max_price`, and `in_stock` filter params
-* NEW: Coupon/discount code support in `update_session` — apply/remove WooCommerce coupons via `promotions` array
-* NEW: Dedicated refund endpoint (`POST /orders/{id}/refund`) — supports partial and full refunds
-* NEW: Order endpoint UCP status mapping — WC statuses mapped to UCP statuses
-* NEW: UCP-standard `shopwalk/v1` namespace — all endpoints now available at `/wp-json/shopwalk/v1/`
-* NEW: Enhanced `/.well-known/ucp` discovery document
-* NEW: Guest checkout assurance — Shopwalk sessions bypass require account store setting
-* NEW: Session expiry — sessions expire after 24 hours with `SESSION_EXPIRED` UCP error
-* NEW: UCP standardized error codes
+* Full UCP v1.1.0 implementation: coupon support, availability endpoint, catalog filters, order tracking, refund/cancel API, guest checkout assurance, auto-registration, `/.well-known/ucp` discovery
 
 = 1.0.0 =
-* Initial release
-* Automatic product catalog sync
-* Real-time inventory and price updates
-* AI discovery integration
-* AI browsing REST API
-* AI checkout via Universal Commerce Protocol (UCP)
-* Order webhook support
-* HPOS compatibility
+* Initial release: product sync, UCP checkout sessions, order webhooks
 
 == Upgrade Notice ==
 
-= 1.7.0 =
-Major update: server-side license model and full self-service dashboard. No action required on upgrade — your partner ID and product sync continue uninterrupted.
-
-= 1.6.0 =
-Adds partner dashboard to WP Admin. No action required.
-
-= 1.5.0 =
-Plugin now auto-registers on activation. Existing installs are unaffected.
-
-= 1.4.0 =
-Bug fix release. Resolves fatal error on PHP 8.x and sync reliability issues. Upgrade recommended.
+= 1.13.0 =
+Documentation update only — no functional changes.
