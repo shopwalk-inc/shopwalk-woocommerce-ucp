@@ -21,7 +21,16 @@ class Shopwalk_WC_Sync {
 	 */
 	private static ?self $instance = null;
 
-	/** Sync API endpoint. */
+	/**
+	 * Store API — canonical product push endpoint (sw_site_* keys, X-Site-Key header).
+	 * Used for product upserts and full product syncs.
+	 */
+	private const STORE_PRODUCTS_ENDPOINT = 'https://api.shopwalk.com/api/v1/store/products';
+
+	/**
+	 * Legacy sync endpoint — retained for coupon events only.
+	 * Product events now go through STORE_PRODUCTS_ENDPOINT.
+	 */
 	private const SYNC_ENDPOINT = 'https://api.shopwalk.com/api/v1/sync/event';
 
 	/** Queue option name. */
@@ -147,8 +156,101 @@ class Shopwalk_WC_Sync {
 	// =========================================================================
 
 	/**
-	 * POST an event payload to the Shopwalk sync endpoint.
-	 * On failure (WP_Error or non-2xx), queues the payload for retry.
+	 * POST a product payload to POST /api/v1/store/products using X-Site-Key.
+	 * This is the canonical path for all product upserts from the WC plugin.
+	 * Does NOT use the retry queue — WC hooks will re-fire on the next save.
+	 *
+	 * @param  array $product_input Payload matching the ProductInput struct.
+	 * @return bool  true on success, false on failure.
+	 */
+	protected function send_product_push( array $product_input ): bool {
+		$api_key = $this->get_api_key();
+		if ( empty( $api_key ) ) {
+			return false;
+		}
+
+		if ( get_option( 'shopwalk_wc_key_invalid', 0 ) ) {
+			return false;
+		}
+
+		$response = wp_remote_post(
+			self::STORE_PRODUCTS_ENDPOINT,
+			array(
+				'timeout' => 15,
+				'headers' => array(
+					'Content-Type' => 'application/json',
+					'X-Site-Key'   => $api_key,
+				),
+				'body'    => wp_json_encode( $product_input ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+
+		if ( 401 === $code ) {
+			update_option( 'shopwalk_wc_key_invalid', 1 );
+			update_option( 'shopwalk_wc_sync_status', 'Error: invalid API key (401)' );
+			return false;
+		}
+
+		return ( $code >= 200 && $code < 300 );
+	}
+
+	/**
+	 * Send DELETE /api/v1/store/products/{external_id} using X-Site-Key.
+	 * Used for product trash and permanent delete events.
+	 * Does NOT use the retry queue — acceptable to miss a delete on transient failure.
+	 *
+	 * @param  string $external_id WC product ID (as string).
+	 * @return bool   true on success, false on failure.
+	 */
+	protected function send_product_delete( string $external_id ): bool {
+		$api_key = $this->get_api_key();
+		if ( empty( $api_key ) ) {
+			return false;
+		}
+
+		if ( get_option( 'shopwalk_wc_key_invalid', 0 ) ) {
+			return false;
+		}
+
+		$url = self::STORE_PRODUCTS_ENDPOINT . '/' . rawurlencode( $external_id );
+
+		$response = wp_remote_request(
+			$url,
+			array(
+				'method'  => 'DELETE',
+				'timeout' => 10,
+				'headers' => array(
+					'Content-Type' => 'application/json',
+					'X-Site-Key'   => $api_key,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+
+		if ( 401 === $code ) {
+			update_option( 'shopwalk_wc_key_invalid', 1 );
+			update_option( 'shopwalk_wc_sync_status', 'Error: invalid API key (401)' );
+			return false;
+		}
+
+		// 404 is acceptable — product may not exist on the API side yet.
+		return ( $code >= 200 && $code < 300 ) || 404 === $code;
+	}
+
+	/**
+	 * POST a coupon/misc event to the legacy sync endpoint using X-API-Key.
+	 * Retained for coupon sync only. On failure, queues for retry.
 	 * On 401, marks the key invalid and does NOT queue.
 	 *
 	 * @param  array $payload Structured event array.
@@ -297,7 +399,7 @@ class Shopwalk_WC_Sync {
 	// =========================================================================
 
 	/**
-	 * Sync a product to Shopwalk (product.upsert).
+	 * Sync a product to Shopwalk via POST /store/products.
 	 *
 	 * @param int   $product_id Parameter.
 	 * @param mixed $product Parameter.
@@ -324,8 +426,8 @@ class Shopwalk_WC_Sync {
 			return;
 		}
 
-		$payload = $this->build_upsert_event( $product );
-		$success = $this->send_event( $payload );
+		$payload = $this->build_product_input( $product );
+		$success = $this->send_product_push( $payload );
 
 		// Record sync status.
 		update_option( 'shopwalk_wc_last_sync', current_time( 'Y-m-d H:i:s' ) );
@@ -333,7 +435,8 @@ class Shopwalk_WC_Sync {
 	}
 
 	/**
-	 * Notify Shopwalk when a product is permanently deleted (product.delete).
+	 * Notify Shopwalk when a product is permanently deleted.
+	 * Sends DELETE /store/products/{external_id}.
 	 * Deduplicates within the same request via $deleted_this_request.
 	 *
 	 * @param int $product_id Parameter.
@@ -353,20 +456,12 @@ class Shopwalk_WC_Sync {
 		}
 		self::$deleted_this_request[] = $product_id;
 
-		$payload = array(
-			'event_type'  => 'product.delete',
-			'source'      => 'plugin',
-			'partner_id' => $this->get_partner_id(),
-			'product'     => array(
-				'external_id' => (string) $product_id,
-			),
-		);
-
-		$this->send_event( $payload );
+		$this->send_product_delete( (string) $product_id );
 	}
 
 	/**
 	 * Handle trashed products — treat as a delete signal.
+	 * Sends DELETE /store/products/{external_id}.
 	 * Also deduplicates via $deleted_this_request.
 	 *
 	 * @param int $post_id Parameter.
@@ -390,16 +485,7 @@ class Shopwalk_WC_Sync {
 			return;
 		}
 
-		$payload = array(
-			'event_type'  => 'product.delete',
-			'source'      => 'plugin',
-			'partner_id' => $this->get_partner_id(),
-			'product'     => array(
-				'external_id' => (string) $post_id,
-			),
-		);
-
-		$this->send_event( $payload );
+		$this->send_product_delete( (string) $post_id );
 	}
 
 	/**
@@ -427,7 +513,9 @@ class Shopwalk_WC_Sync {
 	// =========================================================================
 
 	/**
-	 * Sync a stock-status change (product.stock_update).
+	 * Sync a stock-status change via full product push to POST /store/products.
+	 * The API's ingest pipeline detects price/stock-only changes via checksum
+	 * and skips re-embedding, so this is still a fast path on the server side.
 	 * Hooked to woocommerce_product_set_stock_status.
 	 *
 	 * @param int        $product_id Parameter.
@@ -443,23 +531,12 @@ class Shopwalk_WC_Sync {
 			return;
 		}
 
-		$payload = array(
-			'event_type'  => 'product.stock_update',
-			'source'      => 'plugin',
-			'partner_id' => $this->get_partner_id(),
-			'product'     => array(
-				'external_id'    => (string) $product_id,
-				'in_stock'       => ( 'instock' === $status ),
-				'stock_quantity' => (int) ( $product->get_stock_quantity() ?? 0 ),
-				'stock_status'   => $status,
-			),
-		);
-
-		$this->send_event( $payload );
+		$payload = $this->build_product_input( $product );
+		$this->send_product_push( $payload );
 	}
 
 	/**
-	 * Sync a stock-quantity change (product.stock_update).
+	 * Sync a stock-quantity change via full product push to POST /store/products.
 	 * Hooked to woocommerce_product_set_stock.
 	 *
 	 * @param mixed $product Parameter.
@@ -479,21 +556,8 @@ class Shopwalk_WC_Sync {
 			return;
 		}
 
-		$status = $product->get_stock_status();
-
-		$payload = array(
-			'event_type'  => 'product.stock_update',
-			'source'      => 'plugin',
-			'partner_id' => $this->get_partner_id(),
-			'product'     => array(
-				'external_id'    => (string) $product->get_id(),
-				'in_stock'       => ( 'instock' === $status ),
-				'stock_quantity' => (int) ( $stock_quantity ?? 0 ),
-				'stock_status'   => $status,
-			),
-		);
-
-		$this->send_event( $payload );
+		$payload = $this->build_product_input( $product );
+		$this->send_product_push( $payload );
 	}
 
 	// =========================================================================
@@ -501,8 +565,9 @@ class Shopwalk_WC_Sync {
 	// =========================================================================
 
 	/**
-	 * Sync a price/sale change (product.price_update).
+	 * Sync a price/sale change via full product push to POST /store/products.
 	 * Only fires if price-related props were among the changed properties.
+	 * The API's ingest pipeline detects price-only changes and skips re-embedding.
 	 *
 	 * @param WC_Product $product Parameter.
 	 * @param array      $updated_props Parameter.
@@ -521,24 +586,8 @@ class Shopwalk_WC_Sync {
 			return;
 		}
 
-		$regular_price = (float) $product->get_regular_price();
-		$sale_price    = $product->get_sale_price();
-		$on_sale       = $product->is_on_sale();
-
-		$payload = array(
-			'event_type'  => 'product.price_update',
-			'source'      => 'plugin',
-			'partner_id' => $this->get_partner_id(),
-			'product'     => array(
-				'external_id'      => (string) $product->get_id(),
-				'base_price'       => ( $on_sale && '' !== $sale_price ) ? (float) $sale_price : $regular_price,
-				'compare_at_price' => $on_sale ? $regular_price : null,
-				'on_sale'          => $on_sale,
-				'currency'         => get_woocommerce_currency(),
-			),
-		);
-
-		$this->send_event( $payload );
+		$payload = $this->build_product_input( $product );
+		$this->send_product_push( $payload );
 	}
 
 	// =========================================================================
@@ -671,13 +720,79 @@ class Shopwalk_WC_Sync {
 	}
 
 	// =========================================================================
-	// Payload builder.
+	// Payload builders.
 	// =========================================================================
 
 	/**
-	 * Build the full product.upsert event payload.
+	 * Build a ProductInput payload for POST /api/v1/store/products.
+	 * Field names match the API's ingest.ProductInput struct (JSON tags).
 	 *
 	 * @param WC_Product $product Parameter.
+	 */
+	protected function build_product_input( WC_Product $product ): array {
+		// Categories.
+		$categories = array();
+		$terms      = get_the_terms( $product->get_id(), 'product_cat' );
+		if ( $terms && ! is_wp_error( $terms ) ) {
+			$categories = array_values( array_map( fn( $t ) => $t->name, $terms ) );
+		}
+
+		// Images (featured + gallery).
+		$images   = array();
+		$image_id = $product->get_image_id();
+		if ( $image_id ) {
+			$url = wp_get_attachment_url( $image_id );
+			if ( $url ) {
+				$images[] = array(
+					'url'      => $url,
+					'alt'      => get_post_meta( $image_id, '_wp_attachment_image_alt', true ) ?: $product->get_name(),
+					'position' => 0,
+				);
+			}
+		}
+		foreach ( $product->get_gallery_image_ids() as $i => $gid ) {
+			$url = wp_get_attachment_url( $gid );
+			if ( $url ) {
+				$images[] = array(
+					'url'      => $url,
+					'alt'      => get_post_meta( $gid, '_wp_attachment_image_alt', true ) ?: '',
+					'position' => $i + 1,
+				);
+			}
+		}
+
+		// Pricing.
+		$regular_price = (float) $product->get_regular_price();
+		$sale_price    = $product->get_sale_price();
+		$on_sale       = $product->is_on_sale();
+		$price         = ( $on_sale && '' !== $sale_price ) ? (float) $sale_price : $regular_price;
+		$compare_at    = ( $on_sale && $regular_price > 0 ) ? $regular_price : 0.0;
+
+		return array(
+			'external_id'       => (string) $product->get_id(),
+			'title'             => $product->get_name(),
+			'description'       => $product->get_description(),
+			'short_description' => $product->get_short_description(),
+			'sku'               => $product->get_sku(),
+			'price'             => $price,
+			'compare_at_price'  => $compare_at,
+			'currency'          => get_woocommerce_currency(),
+			'in_stock'          => $product->is_in_stock(),
+			'source_url'        => get_permalink( $product->get_id() ) ?: '',
+			'provider'          => 'woocommerce',
+			'categories'        => $categories,
+			'images'            => $images,
+			'average_rating'    => (float) $product->get_average_rating(),
+			'rating_count'      => (int) $product->get_rating_count(),
+		);
+	}
+
+	/**
+	 * Build the legacy product.upsert event payload for the /sync/event endpoint.
+	 * Retained for reference; product sync now uses build_product_input().
+	 *
+	 * @param WC_Product $product Parameter.
+	 * @deprecated Use build_product_input() + send_product_push() instead.
 	 */
 	protected function build_upsert_event( WC_Product $product ): array {
 		// Categories.
