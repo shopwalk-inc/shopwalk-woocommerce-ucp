@@ -207,16 +207,13 @@ class Shopwalk_WC_Dashboard {
 				<td>
 					<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 20px;">
 						<p style="margin:0 0 10px;font-size:13px;color:#374151;line-height:1.6;">
-							<?php esc_html_e( 'AI doesn't browse your website like a human would. Instead, it connects directly to your store's data and asks structured questions:', 'shopwalk-ai' ); ?>
+							<?php esc_html_e( 'AI doesn't visit your website. It queries Shopwalk for products and your store's answers come back instantly — no page loads, no browsing.', 'shopwalk-ai' ); ?>
 						</p>
-						<ul style="margin:0 0 10px;padding:0 0 0 18px;font-size:13px;color:#374151;line-height:2;">
-							<li><?php esc_html_e( '"Show me waterproof hiking boots under $100"', 'shopwalk-ai' ); ?></li>
-							<li><?php esc_html_e( '"Is this product in stock in size 10?"', 'shopwalk-ai' ); ?></li>
-							<li><?php esc_html_e( '"What's the return policy for this store?"', 'shopwalk-ai' ); ?></li>
+						<ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#374151;line-height:2;">
+							<li><?php esc_html_e( '"Find waterproof hiking boots under $100" → your products', 'shopwalk-ai' ); ?></li>
+							<li><?php esc_html_e( '"Is size 10 in stock?" → live inventory answer', 'shopwalk-ai' ); ?></li>
+							<li><?php esc_html_e( '"What's the return policy?" → your store info', 'shopwalk-ai' ); ?></li>
 						</ul>
-						<p style="margin:0;font-size:13px;color:#374151;line-height:1.6;">
-							<?php esc_html_e( 'Shopwalk is the layer in between — it indexes your products and answers these questions on your behalf. AI never needs to load your website, and your customers get instant, accurate answers.', 'shopwalk-ai' ); ?>
-						</p>
 					</div>
 				</td>
 			</tr>
