@@ -139,7 +139,18 @@ class Shopwalk_WC_Settings {
 	private function render_free(): void {
 		$product_count   = wp_count_posts( 'product' )->publish ?? 0;
 		$ucp_base        = get_site_url() . '/wp-json/shopwalk/v1';
-		$signup_url      = add_query_arg( 'store_url', rawurlencode( get_site_url() ), SHOPWALK_SIGNUP_URL );
+		// Build signup URL prefilled with everything we know about this store.
+		$signup_url = add_query_arg(
+			array(
+				'store_url'     => rawurlencode( get_site_url() ),
+				'store_name'    => rawurlencode( get_bloginfo( 'name' ) ),
+				'product_count' => (int) ( wp_count_posts( 'product' )->publish ?? 0 ),
+				'currency'      => rawurlencode( get_woocommerce_currency() ),
+				'plugin_version'=> rawurlencode( SHOPWALK_VERSION ),
+				'wc_version'    => rawurlencode( defined( 'WC_VERSION' ) ? WC_VERSION : '' ),
+			),
+			SHOPWALK_SIGNUP_URL
+		);
 		$ucp_enabled     = (bool) get_option( 'shopwalk_ucp_discovery_enabled', false );
 		$ucp_reachable   = get_option( 'shopwalk_ucp_reachable', null );
 		$ucp_checked_at  = get_option( 'shopwalk_ucp_checked_at', '' );
@@ -253,20 +264,25 @@ class Shopwalk_WC_Settings {
 				<th><?php esc_html_e( 'Shopwalk Network', 'shopwalk-ai' ); ?></th>
 				<td>
 					<span class="sw-badge sw-badge--inactive"><?php esc_html_e( 'Not connected', 'shopwalk-ai' ); ?></span>
-					<div class="sw-connect-box">
-						<p>
-							<a href="<?php echo esc_url( $signup_url ); ?>" target="_blank" rel="noopener noreferrer" class="button button-primary sw-connect-btn">
-								<?php esc_html_e( 'Connect your Store to Shopwalk — Free', 'shopwalk-ai' ); ?>
-							</a>
+					<div class="sw-connect-box" style="margin-top:12px;padding:20px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:6px;">
+						<p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#1e3a5f;">
+							<?php esc_html_e( 'Get AI orders sent through your store', 'shopwalk-ai' ); ?>
 						</p>
-						<p class="description">
-							<?php esc_html_e( 'Get discovered by AI shoppers. Free to connect.', 'shopwalk-ai' ); ?>
+						<p style="margin:0 0 14px;font-size:13px;color:#374151;line-height:1.5;">
+							<?php esc_html_e( 'Connect to Shopwalk and your store will appear in AI shopping results when customers search for products like yours. Free to connect.', 'shopwalk-ai' ); ?>
 						</p>
+						<a href="<?php echo esc_url( $signup_url ); ?>" target="_blank" rel="noopener noreferrer"
+							class="button button-primary sw-connect-btn" style="font-size:14px;height:36px;line-height:36px;padding:0 18px;">
+							<?php esc_html_e( 'Connect to Shopwalk — Free', 'shopwalk-ai' ); ?>
+						</a>
 					</div>
 
-					<hr class="sw-divider" />
-
-					<p><strong><?php esc_html_e( 'Already have an account? Sign in at shopwalk.com/partners', 'shopwalk-ai' ); ?></strong></p>
+					<p style="margin-top:12px;" class="description">
+						<?php esc_html_e( 'Already have an account?', 'shopwalk-ai' ); ?>
+						<a href="https://shopwalk.com/partners" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Sign in at shopwalk.com/partners →', 'shopwalk-ai' ); ?>
+						</a>
+					</p>
 					<div class="sw-license-row">
 						<input
 							type="text"
