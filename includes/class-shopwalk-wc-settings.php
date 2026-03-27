@@ -155,6 +155,7 @@ class Shopwalk_WC_Settings {
 		$ucp_reachable   = get_option( 'shopwalk_ucp_reachable', null );
 		$ucp_checked_at  = get_option( 'shopwalk_ucp_checked_at', '' );
 		$ucp_host_name   = (string) get_option( 'shopwalk_ucp_host_name', '' );
+		$ucp_host_phone  = (string) get_option( 'shopwalk_ucp_host_phone', '' );
 
 		$ucp_host_support = (string) get_option( 'shopwalk_ucp_host_support', '' );
 		$nonce           = wp_create_nonce( 'shopwalk_dashboard' );
@@ -238,6 +239,14 @@ class Shopwalk_WC_Settings {
 							</p>
 							<p style="margin:0 0 12px;font-size:13px;color:#6c1717;line-height:1.5;">
 								<?php esc_html_e( 'AI shoppers cannot find or browse your store. Call your hosting provider and ask them to enable AI Shopping (Shopwalk) for your account.', 'shopwalk-ai' ); ?>
+							</p>
+							<?php if ( ! empty( $ucp_host_phone ) ) : ?>
+							<p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#8a1f1f;">
+								📞 <?php echo esc_html( $ucp_host_phone ); ?>
+							</p>
+							<?php endif; ?>
+							<p style="margin:0;font-size:13px;color:#6c1717;line-height:1.5;">
+								<?php esc_html_e( 'Ask them to whitelist Shopwalk and enable AI Shopping for your account.', 'shopwalk-ai' ); ?>
 							</p>
 
 							<div style="display:flex;gap:10px;flex-wrap:wrap;">
