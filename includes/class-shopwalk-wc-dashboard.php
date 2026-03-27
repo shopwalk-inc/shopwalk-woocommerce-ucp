@@ -200,6 +200,41 @@ class Shopwalk_WC_Dashboard {
 				</td>
 			</tr>
 
+
+			<!-- What happens now (shown when synced) -->
+			<?php if ( $synced_count > 0 ) : ?>
+			<tr>
+				<th><?php esc_html_e( 'What happens now', 'shopwalk-ai' ); ?></th>
+				<td>
+					<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px 20px;margin-bottom:12px;">
+						<p style="margin:0 0 4px;font-weight:700;color:#166534;font-size:14px;">
+							🎉 <?php esc_html_e( 'Your store is now discoverable by AI', 'shopwalk-ai' ); ?>
+						</p>
+						<p style="margin:0;font-size:13px;color:#15803d;line-height:1.5;">
+							<?php
+							printf(
+								/* translators: %d: synced product count */
+								esc_html__( '%d products are indexed in the Shopwalk network. AI can now find and recommend them to shoppers.', 'shopwalk-ai' ),
+								(int) $synced_count
+							);
+							?>
+						</p>
+					</div>
+
+					<ul style="margin:0;padding:0 0 0 0;list-style:none;font-size:13px;color:#374151;line-height:2;">
+						<li>✅ <?php esc_html_e( 'Your products are indexed — AI searches will find them', 'shopwalk-ai' ); ?></li>
+						<li>✅ <?php esc_html_e( 'New and updated products sync automatically', 'shopwalk-ai' ); ?></li>
+						<li>✅ <?php esc_html_e( 'You get 5% of any purchase AI completes through your store', 'shopwalk-ai' ); ?></li>
+						<li>📊 <?php esc_html_e( 'Check your Partners Portal to see AI traffic to your store', 'shopwalk-ai' ); ?></li>
+					</ul>
+
+					<p style="margin:12px 0 0;font-size:13px;color:#6b7280;">
+						<?php esc_html_e( 'Nothing more to do. Shopwalk handles discovery automatically.', 'shopwalk-ai' ); ?>
+					</p>
+				</td>
+			</tr>
+			<?php endif; ?>
+
 		</table>
 		<?php
 	}
