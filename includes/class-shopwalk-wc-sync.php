@@ -196,7 +196,7 @@ class Shopwalk_WC_Sync {
 		$products = array_map( array( 'Shopwalk_WC_Products', 'format_for_sync' ), $wc_products );
 
 		$response = wp_remote_post(
-			SHOPWALK_API_BASE . '/plugin/pro/sync/batch',
+			SHOPWALK_API_BASE . '/plugin/sync/batch',
 			array(
 				'timeout' => 30,
 				'headers' => array(
@@ -238,7 +238,7 @@ class Shopwalk_WC_Sync {
 		}
 
 		wp_remote_post(
-			SHOPWALK_API_BASE . '/plugin/pro/sync/delete',
+			SHOPWALK_API_BASE . '/plugin/sync/delete',
 			array(
 				'timeout' => 10,
 				'headers' => array(
