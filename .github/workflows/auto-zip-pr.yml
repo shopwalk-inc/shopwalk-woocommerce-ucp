@@ -1,11 +1,14 @@
 name: Auto-rebuild plugin zip on shopwalk-api
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Auto-increment patch version on push to main"]
+    types: [completed]
     branches: [main]
 
 jobs:
   rebuild-zip:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
