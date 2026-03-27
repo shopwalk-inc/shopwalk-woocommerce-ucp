@@ -148,6 +148,7 @@ class Shopwalk_WC_Settings {
 				'currency'      => rawurlencode( get_woocommerce_currency() ),
 				'plugin_version'=> rawurlencode( SHOPWALK_VERSION ),
 				'wc_version'    => rawurlencode( defined( 'WC_VERSION' ) ? WC_VERSION : '' ),
+				'platform'      => 'woocommerce',
 			),
 			SHOPWALK_SIGNUP_URL
 		);
