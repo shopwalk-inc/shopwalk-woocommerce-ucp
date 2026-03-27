@@ -184,6 +184,22 @@ class Shopwalk_WC_Dashboard {
 				</td>
 			</tr>
 
+			<!-- Support -->
+			<tr>
+				<th><?php esc_html_e( 'Support', 'shopwalk-ai' ); ?></th>
+				<td>
+					<a href="mailto:support@shopwalk.com?subject=<?php echo rawurlencode( 'Support Request - ' . get_site_url() ); ?>"
+					   class="button">
+						✉️ <?php esc_html_e( 'Email Support', 'shopwalk-ai' ); ?>
+					</a>
+					&nbsp;
+					<a href="https://help.shopwalk.com" target="_blank" rel="noopener noreferrer" class="button">
+						📖 <?php esc_html_e( 'Help Center ↗', 'shopwalk-ai' ); ?>
+					</a>
+					<p class="description"><?php esc_html_e( 'Typical response time: under 4 hours on business days.', 'shopwalk-ai' ); ?></p>
+				</td>
+			</tr>
+
 		</table>
 		<?php
 	}
