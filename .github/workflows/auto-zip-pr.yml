@@ -1,4 +1,4 @@
-name: Auto-rebuild plugin zip on shopwalk-api
+name: Release plugin zip after version bump
 
 on:
   workflow_run:
@@ -7,11 +7,21 @@ on:
     branches: [main]
 
 jobs:
-  rebuild-zip:
+  release:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main   # ensure we have the version-bumped commit
+          fetch-depth: 0
+
+      - name: Get version
+        id: ver
+        run: |
+          VERSION=$(grep -m1 "^ \* Version:" shopwalk-ai.php | sed "s/.*Version: *//; s/[[:space:]]//g")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Build plugin zip
         run: |
@@ -28,28 +38,13 @@ jobs:
             . dist/shopwalk-ai/
           cd dist && zip -r shopwalk-ai.zip shopwalk-ai/
 
-      - name: Checkout shopwalk-api and open PR
+      - name: Create GitHub Release with zip asset
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.email "ci@shopwalk.com"
-          git config --global user.name "Shopwalk CI"
-
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/shopwalk-inc/shopwalk-api.git" shopwalk-api
-          cd shopwalk-api
-
-          BRANCH="auto/plugin-zip-$(date +%Y%m%d-%H%M%S)"
-          git checkout -b "$BRANCH" origin/main
-          cp ../dist/shopwalk-ai.zip dist/shopwalk-ai.zip
-
-          VERSION=$(grep "Version:" ../shopwalk-ai.php | head -1 | sed "s/.*Version: *//")
-          git add dist/shopwalk-ai.zip
-          git commit -m "chore: auto-rebuild plugin zip from shopwalk-woocommerce-ucp v${VERSION}"
-          git push origin "$BRANCH"
-
-          gh pr create \
-            --repo shopwalk-inc/shopwalk-api \
-            --title "chore: auto-rebuild plugin zip v${VERSION}" \
-            --body "Automated PR from shopwalk-woocommerce-ucp merge to main. Plugin version: ${VERSION}" \
-            --base main \
-            --head "$BRANCH"
+          TAG="${{ steps.ver.outputs.tag }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          gh release create "$TAG" dist/shopwalk-ai.zip \
+            --title "Shopwalk v${VERSION}" \
+            --notes "Auto-release from version bump." \
+            --latest
