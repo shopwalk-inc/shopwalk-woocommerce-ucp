@@ -19,7 +19,7 @@ class Shopwalk_WC_Products {
 	 * @return array Formatted product data.
 	 */
 	public static function format( WC_Product $product ): array {
-		// Build images array.
+		// Build images array — batch meta query to avoid N+1.
 		$images     = array();
 		$image_ids  = $product->get_gallery_image_ids();
 		$main_image = $product->get_image_id();
@@ -27,13 +27,18 @@ class Shopwalk_WC_Products {
 			array_unshift( $image_ids, $main_image );
 		}
 
-		$seen_ids = array();
-		foreach ( $image_ids as $i => $img_id ) {
-			if ( ! $img_id || in_array( $img_id, $seen_ids, true ) ) {
+		// Deduplicate with a hash set (O(1) lookup vs O(n) in_array).
+		$seen = array();
+		// Prime the post meta cache for all image IDs in one query.
+		if ( ! empty( $image_ids ) ) {
+			update_meta_cache( 'post', $image_ids );
+		}
+		foreach ( $image_ids as $img_id ) {
+			if ( ! $img_id || isset( $seen[ $img_id ] ) ) {
 				continue;
 			}
-			$seen_ids[] = $img_id;
-			$url        = wp_get_attachment_url( $img_id );
+			$seen[ $img_id ] = true;
+			$url = wp_get_attachment_url( $img_id );
 			if ( $url ) {
 				$images[] = array(
 					'url'      => $url,
@@ -43,16 +48,25 @@ class Shopwalk_WC_Products {
 			}
 		}
 
-		// Build categories array.
+		// Build categories array — batch query all terms at once.
 		$categories = array();
-		foreach ( $product->get_category_ids() as $cat_id ) {
-			$term = get_term( $cat_id, 'product_cat' );
-			if ( $term && ! is_wp_error( $term ) ) {
-				$categories[] = array(
-					'id'   => $term->term_id,
-					'name' => $term->name,
-					'slug' => $term->slug,
-				);
+		$cat_ids    = $product->get_category_ids();
+		if ( ! empty( $cat_ids ) ) {
+			$terms = get_terms(
+				array(
+					'taxonomy'   => 'product_cat',
+					'include'    => $cat_ids,
+					'hide_empty' => false,
+				)
+			);
+			if ( ! is_wp_error( $terms ) ) {
+				foreach ( $terms as $term ) {
+					$categories[] = array(
+						'id'   => $term->term_id,
+						'name' => $term->name,
+						'slug' => $term->slug,
+					);
+				}
 			}
 		}
 
@@ -69,29 +83,33 @@ class Shopwalk_WC_Products {
 		$regular    = (float) $product->get_regular_price();
 		$dimensions = $product->get_dimensions( false );
 
-		// Build variations for variable products.
+		// Build variations for variable products — batch load to avoid N+1.
 		$variations = array();
 		if ( $product->is_type( 'variable' ) ) {
 			/** @var WC_Product_Variable $product */
-			$variation_ids = $product->get_children();
-			foreach ( array_slice( $variation_ids, 0, 20 ) as $var_id ) {
-				$variation = wc_get_product( $var_id );
-				if ( ! $variation ) {
-					continue;
+			$variation_ids = array_slice( $product->get_children(), 0, 20 );
+			if ( ! empty( $variation_ids ) ) {
+				// Prime the post and meta caches for all variations in one query.
+				_prime_post_caches( $variation_ids, true, true );
+				foreach ( $variation_ids as $var_id ) {
+					$variation = wc_get_product( $var_id );
+					if ( ! $variation ) {
+						continue;
+					}
+					$attrs = array();
+					foreach ( $variation->get_variation_attributes() as $key => $val ) {
+						$clean_key          = str_replace( 'attribute_pa_', '', $key );
+						$clean_key          = str_replace( 'attribute_', '', $clean_key );
+						$attrs[ ucfirst( $clean_key ) ] = $val;
+					}
+					$variations[] = array(
+						'id'         => (string) $var_id,
+						'attributes' => $attrs,
+						'price'      => (float) $variation->get_price(),
+						'in_stock'   => $variation->is_in_stock(),
+						'sku'        => $variation->get_sku(),
+					);
 				}
-				$attrs = array();
-				foreach ( $variation->get_variation_attributes() as $key => $val ) {
-					$clean_key          = str_replace( 'attribute_pa_', '', $key );
-					$clean_key          = str_replace( 'attribute_', '', $clean_key );
-					$attrs[ ucfirst( $clean_key ) ] = $val;
-				}
-				$variations[] = array(
-					'id'         => (string) $var_id,
-					'attributes' => $attrs,
-					'price'      => (float) $variation->get_price(),
-					'in_stock'   => $variation->is_in_stock(),
-					'sku'        => $variation->get_sku(),
-				);
 			}
 		}
 

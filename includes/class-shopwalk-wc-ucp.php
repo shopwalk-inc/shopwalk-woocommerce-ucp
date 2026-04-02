@@ -95,11 +95,11 @@ class Shopwalk_WC_UCP {
 					),
 					'min_price' => array(
 						'default'           => '',
-						'sanitize_callback' => 'sanitize_text_field',
+						'sanitize_callback' => 'floatval',
 					),
 					'max_price' => array(
 						'default'           => '',
-						'sanitize_callback' => 'sanitize_text_field',
+						'sanitize_callback' => 'floatval',
 					),
 					'orderby'  => array(
 						'default'           => 'date',
@@ -759,9 +759,10 @@ class Shopwalk_WC_UCP {
 			return;
 		}
 
-		wp_remote_post(
+		$result = wp_remote_post(
 			SHOPWALK_API_BASE . '/plugin/orders/status',
 			array(
+				'timeout'  => 5,
 				'headers'  => array(
 					'Content-Type'     => 'application/json',
 					'X-SW-License-Key' => $license_key,
@@ -775,9 +776,11 @@ class Shopwalk_WC_UCP {
 						'to_status'   => $to,
 					)
 				),
-				'blocking' => false,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			error_log( 'Shopwalk order status push failed: ' . $result->get_error_message() );
+		}
 	}
 
 	// ─────────────────────────────────────────────────────────────────

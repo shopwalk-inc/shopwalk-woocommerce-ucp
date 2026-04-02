@@ -458,13 +458,29 @@ class Shopwalk_WC_Settings {
 			);
 		}
 
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			return array(
+				'reachable'  => null,
+				'checked_at' => $checked_at,
+				'error'      => sprintf( __( 'Shopwalk API returned HTTP %d.', 'shopwalk-ai' ), $code ),
+			);
+		}
+
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $body ) ) {
+			return array(
+				'reachable'  => null,
+				'checked_at' => $checked_at,
+				'error'      => __( 'Invalid response from Shopwalk API.', 'shopwalk-ai' ),
+			);
+		}
+
 		$reachable = (bool) ( $body['reachable'] ?? false );
 
 		update_option( 'shopwalk_ucp_reachable', $reachable );
 		update_option( 'shopwalk_ucp_checked_at', $checked_at );
 		update_option( 'shopwalk_ucp_host_name', sanitize_text_field( $body['host_name'] ?? '' ) );
-
 		update_option( 'shopwalk_ucp_host_support', esc_url_raw( $body['host_support'] ?? '' ) );
 
 		return array(
@@ -472,7 +488,6 @@ class Shopwalk_WC_Settings {
 			'checked_at'   => $checked_at,
 			'reason'       => $body['reason'] ?? '',
 			'host_name'    => $body['host_name'] ?? '',
-
 			'host_support' => $body['host_support'] ?? '',
 		);
 	}
