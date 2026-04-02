@@ -189,6 +189,15 @@ class Shopwalk_WC_Sync {
 		$key    = get_option( 'shopwalk_license_key', '' );
 		$domain = get_option( 'shopwalk_site_domain', '' );
 
+		// Derive domain from site URL if not set (e.g. fresh install).
+		if ( empty( $domain ) ) {
+			$parsed = wp_parse_url( get_site_url() );
+			$domain = $parsed['host'] ?? '';
+			if ( ! empty( $domain ) ) {
+				update_option( 'shopwalk_site_domain', $domain );
+			}
+		}
+
 		if ( empty( $key ) || empty( $domain ) ) {
 			return false;
 		}
@@ -232,6 +241,11 @@ class Shopwalk_WC_Sync {
 	private function push_delete( string $external_id ): void {
 		$key    = get_option( 'shopwalk_license_key', '' );
 		$domain = get_option( 'shopwalk_site_domain', '' );
+
+		if ( empty( $domain ) ) {
+			$parsed = wp_parse_url( get_site_url() );
+			$domain = $parsed['host'] ?? '';
+		}
 
 		if ( empty( $key ) || empty( $domain ) ) {
 			return;
