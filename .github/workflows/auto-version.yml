@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - '.github/**'   # prevent infinite loop from version commit triggering this
+      - '.github/**'
 
 jobs:
   bump-version:
@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CROSS_REPO_TOKEN }}
           fetch-depth: 0
 
       - name: Get current version
@@ -37,20 +37,14 @@ jobs:
       - name: Update version in plugin files
         run: |
           NEW="${{ steps.bump.outputs.new_version }}"
-
-          # shopwalk-ai.php — plugin header
           sed -i "s/^ \* Version:.*/ * Version:     ${NEW}/" shopwalk-ai.php
-
-          # shopwalk-ai.php — SHOPWALK_VERSION constant
           sed -i "s/define( 'SHOPWALK_VERSION', '[^']*' )/define( 'SHOPWALK_VERSION', '${NEW}' )/" shopwalk-ai.php
-
-          # readme.txt — Stable tag
           sed -i "s/^Stable tag:.*/Stable tag: ${NEW}/" readme.txt
 
-      - name: Commit version bump
+      - name: Commit and push version bump
         run: |
           git config user.email "ci@shopwalk.com"
           git config user.name "Shopwalk CI"
           git add shopwalk-ai.php readme.txt
           git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
-          git push
+          git push https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/shopwalk-inc/shopwalk-woocommerce.git HEAD:main
