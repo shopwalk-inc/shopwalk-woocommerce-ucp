@@ -35,8 +35,26 @@ class Shopwalk_WC_Dashboard {
 	 * Constructor.
 	 */
 	private function __construct() {
+		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'wp_ajax_shopwalk_open_portal', array( $this, 'ajax_open_portal' ) );
 		add_action( 'wp_ajax_shopwalk_run_diagnostics', array( $this, 'ajax_run_diagnostics' ) );
+	}
+
+	/**
+	 * Register the top-level Shopwalk menu in WP Admin.
+	 *
+	 * @return void
+	 */
+	public function register_menu(): void {
+		add_menu_page(
+			__( 'Shopwalk', 'shopwalk-ai' ),
+			__( 'Shopwalk', 'shopwalk-ai' ),
+			'manage_woocommerce',
+			'shopwalk',
+			array( $this, 'render' ),
+			'dashicons-store',
+			56
+		);
 	}
 
 	/**
