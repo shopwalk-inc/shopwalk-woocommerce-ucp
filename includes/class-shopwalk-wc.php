@@ -41,38 +41,12 @@ class Shopwalk_WC {
 		// Always active — settings page shows UCP status + connect link or licensed dashboard.
 		Shopwalk_WC_Settings::instance();
 
-		// Licensed only — sync and full dashboard require a valid license key.
-		// NO API calls are made unless a license key is installed.
-		if ( $this->is_licensed() ) {
-			Shopwalk_WC_Sync::instance();
-			Shopwalk_WC_Dashboard::instance();
-		}
+		// Always activate sync and dashboard — the plugin ships with a license key
+		// embedded in the zip. No manual "connect" step needed.
+		Shopwalk_WC_Sync::instance();
+		Shopwalk_WC_Dashboard::instance();
 
-		// Top-level admin menu for unlicensed stores (shows connect prompt).
-		if ( ! $this->is_licensed() ) {
-			add_action( 'admin_menu', function () {
-				add_menu_page(
-					__( 'Shopwalk', 'shopwalk-ai' ),
-					__( 'Shopwalk', 'shopwalk-ai' ),
-					'manage_woocommerce',
-					'shopwalk',
-					function () {
-						$settings_url = admin_url( 'admin.php?page=wc-settings&tab=shopwalk' );
-						echo '<div class="wrap"><h1>' . esc_html__( 'Shopwalk', 'shopwalk-ai' ) . '</h1>';
-						echo '<p>' . esc_html__( 'Connect your store to the Shopwalk AI commerce network.', 'shopwalk-ai' ) . '</p>';
-						echo '<a href="' . esc_url( $settings_url ) . '" class="button button-primary">';
-						echo esc_html__( 'Go to Settings', 'shopwalk-ai' ) . '</a></div>';
-					},
-					'dashicons-store',
-					56
-				);
-			} );
-		}
-
-		// Admin notices.
-		add_action( 'admin_notices', array( $this, 'admin_notices' ) );
-
-		// AJAX: dismiss the connect notice.
+		// AJAX: dismiss the connect notice (kept for backward compat).
 		add_action( 'wp_ajax_shopwalk_dismiss_notice', array( $this, 'ajax_dismiss_notice' ) );
 	}
 
