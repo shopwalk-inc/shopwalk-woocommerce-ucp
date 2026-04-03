@@ -116,7 +116,7 @@ class Shopwalk_WC_Dashboard {
 		$latest = get_transient( 'shopwalk_latest_version' );
 		if ( false === $latest ) {
 			$response = wp_remote_get(
-				SHOPWALK_API_BASE . '/plugin/pro/version',
+				SHOPWALK_API_BASE . '/plugin/version',
 				array( 'timeout' => 5 )
 			);
 			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
