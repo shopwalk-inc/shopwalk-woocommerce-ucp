@@ -35,18 +35,21 @@ class Shopwalk_WC {
 	 * Constructor.
 	 */
 	private function __construct() {
-		// Always active — UCP endpoints require NO license, NO account, NO API calls.
+		// Always active — UCP endpoints work without a license or account.
 		Shopwalk_WC_UCP::instance();
 
-		// Always active — settings page shows UCP status + connect link or licensed dashboard.
+		// Always active — settings page shows connect CTA or licensed dashboard.
 		Shopwalk_WC_Settings::instance();
 
-		// Always activate sync and dashboard — the plugin ships with a license key
-		// embedded in the zip. No manual "connect" step needed.
-		Shopwalk_WC_Sync::instance();
+		// Always active — dashboard page handles both licensed and unlicensed states.
 		Shopwalk_WC_Dashboard::instance();
 
-		// AJAX: dismiss the connect notice (kept for backward compat).
+		// Sync only runs when licensed — no point registering hooks without a key.
+		if ( $this->is_licensed() ) {
+			Shopwalk_WC_Sync::instance();
+		}
+
+		// AJAX: dismiss the connect notice.
 		add_action( 'wp_ajax_shopwalk_dismiss_notice', array( $this, 'ajax_dismiss_notice' ) );
 	}
 

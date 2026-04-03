@@ -1,6 +1,6 @@
 <?php
 /**
- * Licensed dashboard — minimal WP Admin UI that directs to Partners Portal.
+ * Shopwalk WP Admin dashboard — shows licensed or unlicensed state.
  *
  * @package Shopwalk
  */
@@ -44,6 +44,16 @@ class Shopwalk_WC_Dashboard {
 	}
 
 	/**
+	 * Check if a valid license key is installed.
+	 *
+	 * @return bool
+	 */
+	private function is_licensed(): bool {
+		$key = (string) get_option( 'shopwalk_license_key', '' );
+		return ! empty( $key ) && ( str_starts_with( $key, 'sw_lic_' ) || str_starts_with( $key, 'sw_site_' ) );
+	}
+
+	/**
 	 * Enqueue admin.js + admin.css on the Shopwalk dashboard page.
 	 *
 	 * @param string $hook Current admin page hook.
@@ -72,7 +82,7 @@ class Shopwalk_WC_Dashboard {
 			array(
 				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 				'nonce'      => wp_create_nonce( 'shopwalk_dashboard' ),
-				'isLicensed' => true,
+				'isLicensed' => $this->is_licensed(),
 				'strings'    => array(
 					'activating'   => __( 'Activating…', 'shopwalk-ai' ),
 					'deactivating' => __( 'Deactivating…', 'shopwalk-ai' ),
@@ -136,7 +146,6 @@ class Shopwalk_WC_Dashboard {
 		printf(
 			'<div class="notice notice-warning"><p><strong>%s</strong> %s <a href="%s" target="_blank">%s</a></p></div>',
 			esc_html__( 'Shopwalk update available:', 'shopwalk-ai' ),
-			/* translators: %1$s: current version, %2$s: latest version */
 			sprintf(
 				esc_html__( 'You are running v%1$s. Version %2$s is available.', 'shopwalk-ai' ),
 				esc_html( SHOPWALK_VERSION ),
@@ -148,11 +157,164 @@ class Shopwalk_WC_Dashboard {
 	}
 
 	/**
-	 * Render the licensed dashboard.
+	 * Render — routes to licensed or unlicensed view.
 	 *
 	 * @return void
 	 */
 	public function render(): void {
+		if ( $this->is_licensed() ) {
+			$this->render_licensed();
+		} else {
+			$this->render_unlicensed();
+		}
+	}
+
+	// ─── Unlicensed dashboard ────────────────────────────────────────────────
+
+	/**
+	 * Render the unlicensed dashboard — UCP active, connect CTA.
+	 *
+	 * @return void
+	 */
+	private function render_unlicensed(): void {
+		$product_count = (int) ( wp_count_posts( 'product' )->publish ?? 0 );
+		$ucp_base      = get_site_url() . '/wp-json/shopwalk/v1';
+		$callback_url  = admin_url( 'admin.php?page=wc-settings&tab=shopwalk' );
+		$signup_url    = add_query_arg(
+			array(
+				'store_url'     => rawurlencode( get_site_url() ),
+				'store_name'    => rawurlencode( get_bloginfo( 'name' ) ),
+				'product_count' => (int) $product_count,
+				'currency'      => rawurlencode( get_woocommerce_currency() ),
+				'platform'      => 'woocommerce',
+				'callback_url'  => rawurlencode( $callback_url ),
+			),
+			SHOPWALK_SIGNUP_URL
+		);
+		$nonce = wp_create_nonce( 'shopwalk_dashboard' );
+		?>
+		<h2><?php esc_html_e( 'Shopwalk', 'shopwalk-ai' ); ?></h2>
+
+		<table class="form-table sw-table" role="presentation">
+
+			<!-- UCP Status -->
+			<tr>
+				<th><?php esc_html_e( 'UCP Status', 'shopwalk-ai' ); ?></th>
+				<td>
+					<span class="sw-badge sw-badge--active">✅ <?php esc_html_e( 'Active', 'shopwalk-ai' ); ?></span>
+					<ul class="sw-endpoints">
+						<li>
+							<strong><?php esc_html_e( 'Products:', 'shopwalk-ai' ); ?></strong>
+							<code><?php echo esc_html( $ucp_base . '/products' ); ?></code>
+						</li>
+						<li>
+							<strong><?php esc_html_e( 'Store:', 'shopwalk-ai' ); ?></strong>
+							<code><?php echo esc_html( $ucp_base . '/store' ); ?></code>
+						</li>
+					</ul>
+					<p class="description">
+						<?php
+						printf(
+							esc_html__( '%1$d published products · %2$s · WooCommerce %3$s', 'shopwalk-ai' ),
+							(int) $product_count,
+							esc_html( get_woocommerce_currency() ),
+							esc_html( defined( 'WC_VERSION' ) ? WC_VERSION : '' )
+						);
+						?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- Connect to Shopwalk -->
+			<tr>
+				<th><?php esc_html_e( 'Shopwalk Network', 'shopwalk-ai' ); ?></th>
+				<td>
+					<span class="sw-badge sw-badge--inactive"><?php esc_html_e( 'Not connected', 'shopwalk-ai' ); ?></span>
+					<div style="margin-top:12px;padding:20px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:6px;">
+						<p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#1e3a5f;">
+							<?php esc_html_e( 'Get AI orders sent through your store', 'shopwalk-ai' ); ?>
+						</p>
+						<p style="margin:0 0 14px;font-size:13px;color:#374151;line-height:1.5;">
+							<?php esc_html_e( 'Connect to Shopwalk and your store will appear in AI shopping results when customers search for products like yours. Free to connect — 5% only on AI-completed sales.', 'shopwalk-ai' ); ?>
+						</p>
+						<a href="<?php echo esc_url( $signup_url ); ?>" target="_blank" rel="noopener noreferrer"
+							class="button button-primary" style="font-size:14px;height:36px;line-height:36px;padding:0 18px;">
+							<?php esc_html_e( 'Connect to Shopwalk — Free', 'shopwalk-ai' ); ?>
+						</a>
+					</div>
+
+					<p style="margin-top:12px;" class="description">
+						<?php esc_html_e( 'Already have an account?', 'shopwalk-ai' ); ?>
+						<a href="https://shopwalk.com/partners" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Sign in at shopwalk.com/partners', 'shopwalk-ai' ); ?>
+						</a>
+					</p>
+					<div style="margin-top:8px;" class="sw-license-row">
+						<input type="text" id="sw-license-key" class="regular-text" placeholder="sw_site_..." autocomplete="off" />
+						<button type="button" class="button button-secondary" id="sw-activate-btn">
+							<?php esc_html_e( 'Activate License', 'shopwalk-ai' ); ?>
+						</button>
+					</div>
+					<div id="sw-activate-result" class="sw-result" style="display:none;"></div>
+				</td>
+			</tr>
+
+			<!-- How it works -->
+			<tr>
+				<th style="vertical-align:top;padding-top:14px;"><?php esc_html_e( 'How it works', 'shopwalk-ai' ); ?></th>
+				<td>
+					<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 20px;">
+						<p style="margin:0 0 12px;font-size:13px;color:#374151;line-height:1.6;">
+							<?php esc_html_e( 'Shopwalk indexes your product catalog and prepares it for AI consumption. When a shopper asks an AI assistant for a product, Shopwalk matches the request to your inventory and directs AI through your store\'s checkout using the Universal Commerce Protocol (UCP).', 'shopwalk-ai' ); ?>
+						</p>
+						<ol style="margin:0;padding:0 0 0 18px;font-size:13px;color:#374151;line-height:2.2;">
+							<li><strong><?php esc_html_e( 'Index', 'shopwalk-ai' ); ?></strong> — <?php esc_html_e( 'Your products are synced and indexed in the Shopwalk network', 'shopwalk-ai' ); ?></li>
+							<li><strong><?php esc_html_e( 'Match', 'shopwalk-ai' ); ?></strong> — <?php esc_html_e( 'AI queries Shopwalk and your products are matched to shopper intent', 'shopwalk-ai' ); ?></li>
+							<li><strong><?php esc_html_e( 'Checkout', 'shopwalk-ai' ); ?></strong> — <?php esc_html_e( 'AI completes the purchase through your WooCommerce checkout via UCP', 'shopwalk-ai' ); ?></li>
+						</ol>
+					</div>
+				</td>
+			</tr>
+
+			<!-- Tools -->
+			<tr>
+				<th><?php esc_html_e( 'Tools', 'shopwalk-ai' ); ?></th>
+				<td>
+					<button type="button" class="button" id="sw-diag-btn"
+						data-nonce="<?php echo esc_attr( $nonce ); ?>">
+						🔍 <?php esc_html_e( 'Run Diagnostics', 'shopwalk-ai' ); ?>
+					</button>
+					<div id="sw-diag-results" style="display:none;margin-top:12px;"></div>
+				</td>
+			</tr>
+
+			<!-- Support -->
+			<tr>
+				<th><?php esc_html_e( 'Support', 'shopwalk-ai' ); ?></th>
+				<td>
+					<a href="mailto:support@shopwalk.com?subject=<?php echo rawurlencode( 'Support Request - ' . get_site_url() ); ?>" class="button">
+						✉️ <?php esc_html_e( 'Email Support', 'shopwalk-ai' ); ?>
+					</a>
+					&nbsp;
+					<a href="https://help.shopwalk.com" target="_blank" rel="noopener noreferrer" class="button">
+						📖 <?php esc_html_e( 'Help Center ↗', 'shopwalk-ai' ); ?>
+					</a>
+					<p class="description"><?php esc_html_e( 'Typical response time: under 4 hours on business days.', 'shopwalk-ai' ); ?></p>
+				</td>
+			</tr>
+
+		</table>
+		<?php
+	}
+
+	// ─── Licensed dashboard ──────────────────────────────────────────────────
+
+	/**
+	 * Render the licensed (connected) dashboard.
+	 *
+	 * @return void
+	 */
+	private function render_licensed(): void {
 		$product_count = (int) ( wp_count_posts( 'product' )->publish ?? 0 );
 		$synced_count  = (int) get_option( 'shopwalk_synced_count', 0 );
 		$last_sync     = get_option( 'shopwalk_last_sync_at', '' );
@@ -187,7 +349,6 @@ class Shopwalk_WC_Dashboard {
 					<p class="description">
 						<?php
 						printf(
-							/* translators: %1$d: product count, %2$s: currency, %3$s: WC version */
 							esc_html__( '%1$d published products · %2$s · WooCommerce %3$s', 'shopwalk-ai' ),
 							(int) $product_count,
 							esc_html( get_woocommerce_currency() ),
@@ -206,7 +367,6 @@ class Shopwalk_WC_Dashboard {
 						✅
 						<?php
 						printf(
-							/* translators: %1$d: synced count, %2$s: last sync time */
 							esc_html__( 'Connected · %1$d synced · Last sync: %2$s', 'shopwalk-ai' ),
 							(int) $synced_count,
 							esc_html( $last_sync_fmt )
@@ -218,7 +378,6 @@ class Shopwalk_WC_Dashboard {
 						<p class="description">
 							<?php
 							printf(
-								/* translators: %s: partner ID (truncated) */
 								esc_html__( 'Partner ID: %s', 'shopwalk-ai' ),
 								esc_html( substr( $partner_id, 0, 8 ) . '…' )
 							);
@@ -250,7 +409,6 @@ class Shopwalk_WC_Dashboard {
 					<p class="description" id="sw-sync-status">
 						<?php
 						printf(
-							/* translators: %1$d: synced count, %2$s: last sync, %3$d: queue count */
 							esc_html__( '%1$d products synced · Last sync: %2$s · %3$d pending', 'shopwalk-ai' ),
 							(int) $synced_count,
 							esc_html( $last_sync_fmt ),
@@ -308,8 +466,7 @@ class Shopwalk_WC_Dashboard {
 				</td>
 			</tr>
 
-
-			<!-- How AI works (always shown when connected) -->
+			<!-- How it works -->
 			<tr>
 				<th style="vertical-align:top;padding-top:14px;"><?php esc_html_e( 'How it works', 'shopwalk-ai' ); ?></th>
 				<td>
@@ -325,7 +482,6 @@ class Shopwalk_WC_Dashboard {
 					</div>
 				</td>
 			</tr>
-
 
 			<!-- AI Preview (shown when synced) -->
 			<?php if ( $synced_count > 0 ) : ?>
@@ -348,7 +504,6 @@ class Shopwalk_WC_Dashboard {
 					}
 
 					$ai_message = sprintf(
-						/* translators: %1$s: store name, %2$s: description, %3$s: product count, %4$s: currency */
 						__( 'I found %1$s — %2$s They carry %3$s products, priced in %4$s. Would you like me to search their catalog?', 'shopwalk-ai' ),
 						esc_html( $store_name ),
 						esc_html( mb_strimwidth( $store_desc, 0, 140, '…' ) ) . ' ',
@@ -357,16 +512,13 @@ class Shopwalk_WC_Dashboard {
 					);
 					?>
 					<div class="sw-ai-chat-preview" style="border-radius:12px;overflow:hidden;border:1px solid #1e293b;max-width:560px;">
-						<!-- Window chrome -->
 						<div style="background:#0f172a;padding:10px 14px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b;">
 							<span style="width:10px;height:10px;border-radius:50%;background:#ff5f57;display:inline-block;"></span>
 							<span style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;display:inline-block;"></span>
 							<span style="width:10px;height:10px;border-radius:50%;background:#28c840;display:inline-block;"></span>
 							<span style="font-size:11px;color:#475569;font-family:monospace;margin:0 auto;">shopwalk — AI commerce</span>
 						</div>
-						<!-- Chat -->
 						<div style="background:#0f172a;padding:16px;display:flex;flex-direction:column;gap:12px;">
-							<!-- User prompt -->
 							<div style="display:flex;justify-content:flex-end;gap:8px;align-items:flex-end;">
 								<div style="background:#1e293b;border-radius:12px 12px 2px 12px;padding:8px 14px;max-width:280px;">
 									<p style="margin:0;font-size:13px;color:#94a3b8;">
@@ -375,7 +527,6 @@ class Shopwalk_WC_Dashboard {
 								</div>
 								<div style="width:28px;height:28px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;color:#94a3b8;">You</div>
 							</div>
-							<!-- AI response -->
 							<div style="display:flex;gap:8px;align-items:flex-start;">
 								<div style="width:28px;height:28px;border-radius:50%;background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#0ea5e9;font-weight:700;">✦</div>
 								<div style="background:#1e293b;border-radius:2px 12px 12px 12px;padding:10px 14px;flex:1;" id="sw-ai-preview-box">
@@ -391,22 +542,18 @@ class Shopwalk_WC_Dashboard {
 						var el = document.getElementById('sw-ai-preview-text');
 						if (!el) return;
 						var i = 0;
-						var delay = 400;
 						setTimeout(function() {
 							var iv = setInterval(function() {
 								el.textContent = msg.slice(0, i + 1);
 								i++;
-								if (i >= msg.length) {
-									clearInterval(iv);
-								}
+								if (i >= msg.length) clearInterval(iv);
 							}, 16);
-						}, delay);
+						}, 400);
 					})();
 					</script>
 				</td>
 			</tr>
 			<?php endif; ?>
-
 
 			<!-- What happens now (shown when synced) -->
 			<?php if ( $synced_count > 0 ) : ?>
@@ -420,21 +567,18 @@ class Shopwalk_WC_Dashboard {
 						<p style="margin:0;font-size:13px;color:#15803d;line-height:1.5;">
 							<?php
 							printf(
-								/* translators: %d: synced product count */
 								esc_html__( '%d products are indexed in the Shopwalk network. AI can now find and recommend them to shoppers.', 'shopwalk-ai' ),
 								(int) $synced_count
 							);
 							?>
 						</p>
 					</div>
-
-					<ul style="margin:0;padding:0 0 0 0;list-style:none;font-size:13px;color:#374151;line-height:2;">
+					<ul style="margin:0;padding:0;list-style:none;font-size:13px;color:#374151;line-height:2;">
 						<li>✅ <?php esc_html_e( 'Your products are indexed — AI searches will find them', 'shopwalk-ai' ); ?></li>
 						<li>✅ <?php esc_html_e( 'New and updated products sync automatically', 'shopwalk-ai' ); ?></li>
-						<li>✅ <?php esc_html_e( 'You get 5% of any purchase AI completes through your store', 'shopwalk-ai' ); ?></li>
+						<li>✅ <?php esc_html_e( 'You earn on every purchase AI completes through your store', 'shopwalk-ai' ); ?></li>
 						<li>📊 <?php esc_html_e( 'Check your Partners Portal to see AI traffic to your store', 'shopwalk-ai' ); ?></li>
 					</ul>
-
 					<p style="margin:12px 0 0;font-size:13px;color:#6b7280;">
 						<?php esc_html_e( 'Nothing more to do. Shopwalk handles discovery automatically.', 'shopwalk-ai' ); ?>
 					</p>
@@ -445,6 +589,8 @@ class Shopwalk_WC_Dashboard {
 		</table>
 		<?php
 	}
+
+	// ─── AJAX handlers ───────────────────────────────────────────────────────
 
 	/**
 	 * AJAX: generate magic link and return Partners Portal URL.
@@ -478,7 +624,6 @@ class Shopwalk_WC_Dashboard {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			// Fallback to portal homepage.
 			wp_send_json_success( array( 'url' => SHOPWALK_PARTNERS_URL ) );
 			return;
 		}
@@ -503,7 +648,6 @@ class Shopwalk_WC_Dashboard {
 		global $wp_version;
 		$checks = array();
 
-		// PHP >= 8.0.
 		$php_ok   = version_compare( PHP_VERSION, '8.0', '>=' );
 		$checks[] = array(
 			'name'  => __( 'PHP Version', 'shopwalk-ai' ),
@@ -512,7 +656,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $php_ok ? '' : __( 'Upgrade PHP to 8.0 or higher.', 'shopwalk-ai' ),
 		);
 
-		// WordPress >= 6.0.
 		$wp_ok    = version_compare( $wp_version, '6.0', '>=' );
 		$checks[] = array(
 			'name'  => __( 'WordPress Version', 'shopwalk-ai' ),
@@ -521,7 +664,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $wp_ok ? '' : __( 'Update WordPress to 6.0 or higher.', 'shopwalk-ai' ),
 		);
 
-		// WooCommerce >= 8.0.
 		$wc_ver   = defined( 'WC_VERSION' ) ? WC_VERSION : '0';
 		$wc_ok    = version_compare( $wc_ver, '8.0', '>=' );
 		$checks[] = array(
@@ -531,7 +673,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $wc_ok ? '' : __( 'Update WooCommerce to 8.0 or higher.', 'shopwalk-ai' ),
 		);
 
-		// Memory limit >= 128M.
 		$mem_limit = ini_get( 'memory_limit' );
 		$mem_bytes = wp_convert_hr_to_bytes( $mem_limit );
 		$mem_ok    = $mem_bytes < 0 || $mem_bytes >= 128 * MB_IN_BYTES;
@@ -542,7 +683,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $mem_ok ? '' : __( 'Increase PHP memory_limit to at least 128M.', 'shopwalk-ai' ),
 		);
 
-		// Pretty permalinks.
 		$permalink = get_option( 'permalink_structure', '' );
 		$perm_ok   = ! empty( $permalink );
 		$checks[]  = array(
@@ -552,7 +692,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $perm_ok ? '' : __( 'Enable pretty permalinks under Settings → Permalinks.', 'shopwalk-ai' ),
 		);
 
-		// UCP endpoint reachable.
 		$ucp_url  = get_site_url() . '/wp-json/shopwalk/v1/store';
 		$ucp_resp = wp_remote_get( $ucp_url, array( 'timeout' => 8 ) );
 		$ucp_code = is_wp_error( $ucp_resp ) ? 0 : wp_remote_retrieve_response_code( $ucp_resp );
@@ -564,7 +703,6 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $ucp_ok ? '' : __( 'Check that pretty permalinks are enabled and REST API is not blocked.', 'shopwalk-ai' ),
 		);
 
-		// Shopwalk API reachable.
 		$api_resp = wp_remote_get( 'https://api.shopwalk.com/health', array( 'timeout' => 8 ) );
 		$api_ok   = ! is_wp_error( $api_resp ) && 200 === wp_remote_retrieve_response_code( $api_resp );
 		$checks[] = array(
@@ -574,14 +712,13 @@ class Shopwalk_WC_Dashboard {
 			'fix'   => $api_ok ? '' : __( 'Check server firewall settings. Must be able to reach api.shopwalk.com.', 'shopwalk-ai' ),
 		);
 
-		// License key present.
 		$lic_key  = (string) get_option( 'shopwalk_license_key', '' );
-		$lic_ok   = str_starts_with( $lic_key, 'sw_lic_' ) || str_starts_with( $lic_key, 'sw_site_' );
+		$lic_ok   = ! empty( $lic_key ) && ( str_starts_with( $lic_key, 'sw_lic_' ) || str_starts_with( $lic_key, 'sw_site_' ) );
 		$checks[] = array(
 			'name'  => __( 'License Key', 'shopwalk-ai' ),
 			'ok'    => $lic_ok,
 			'value' => $lic_ok ? __( 'Installed', 'shopwalk-ai' ) : __( 'Not installed', 'shopwalk-ai' ),
-			'fix'   => $lic_ok ? '' : __( 'Enter your license key in the settings page.', 'shopwalk-ai' ),
+			'fix'   => $lic_ok ? '' : __( 'Connect to Shopwalk or enter your license key.', 'shopwalk-ai' ),
 		);
 
 		wp_send_json_success( array( 'checks' => $checks ) );
@@ -589,7 +726,6 @@ class Shopwalk_WC_Dashboard {
 
 	/**
 	 * AJAX: deactivate the license on this site.
-	 * Clears local options but preserves the Shopwalk account server-side.
 	 *
 	 * @return void
 	 */
@@ -599,7 +735,6 @@ class Shopwalk_WC_Dashboard {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'shopwalk-ai' ) ), 403 );
 		}
 
-		// Notify Shopwalk API (best-effort).
 		$key    = get_option( 'shopwalk_license_key', '' );
 		$domain = get_option( 'shopwalk_site_domain', '' );
 		if ( ! empty( $key ) && ! empty( $domain ) ) {
@@ -616,7 +751,6 @@ class Shopwalk_WC_Dashboard {
 			);
 		}
 
-		// Clear local state.
 		$options = array(
 			'shopwalk_license_key',
 			'shopwalk_site_domain',
@@ -649,16 +783,13 @@ class Shopwalk_WC_Dashboard {
 		}
 		if ( $diff < 3600 ) {
 			$mins = (int) floor( $diff / 60 );
-			/* translators: %d: minutes */
 			return sprintf( _n( '%d min ago', '%d mins ago', $mins, 'shopwalk-ai' ), $mins );
 		}
 		if ( $diff < 86400 ) {
 			$hours = (int) floor( $diff / 3600 );
-			/* translators: %d: hours */
 			return sprintf( _n( '%d hour ago', '%d hours ago', $hours, 'shopwalk-ai' ), $hours );
 		}
 		$days = (int) floor( $diff / 86400 );
-		/* translators: %d: days */
 		return sprintf( _n( '%d day ago', '%d days ago', $days, 'shopwalk-ai' ), $days );
 	}
 }
