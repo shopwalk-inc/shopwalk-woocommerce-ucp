@@ -56,7 +56,7 @@ AI agents — built on Claude, GPT, Gemini, and every major platform — need a 
 
 ### Manual Installation
 
-1. Download the latest release zip from the [Releases page](https://github.com/shopwalk-inc/shopwalk-woocommerce-ucp/releases)
+1. Download the latest release zip from the [Releases page](https://github.com/shopwalk-inc/woocommerce-ucp/releases)
 2. In your WordPress admin, go to **Plugins → Add New → Upload Plugin**
 3. Upload the zip and activate
 4. Go to **WooCommerce → Shopwalk** to verify status
@@ -185,8 +185,8 @@ No. The plugin is server-side only — no scripts, no styles, no frontend change
 We welcome bug reports, security disclosures, and pull requests.
 
 ```bash
-git clone https://github.com/shopwalk-inc/shopwalk-woocommerce-ucp.git
-cd shopwalk-woocommerce-ucp
+git clone https://github.com/shopwalk-inc/woocommerce-ucp.git
+cd woocommerce-ucp
 composer install
 
 # Run coding standards check

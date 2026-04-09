@@ -47,4 +47,4 @@ jobs:
           git config user.name "Shopwalk CI"
           git add shopwalk-ai.php readme.txt
           git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
-          git push https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/shopwalk-inc/shopwalk-woocommerce.git HEAD:main
+          git push https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/shopwalk-inc/woocommerce-ucp.git HEAD:main

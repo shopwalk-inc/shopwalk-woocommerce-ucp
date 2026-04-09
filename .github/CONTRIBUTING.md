@@ -35,8 +35,8 @@ Open an issue first if you're unsure — saves everyone time.
 
 ```bash
 # Clone the repo
-git clone https://github.com/shopwalk-inc/shopwalk-woocommerce-ucp.git
-cd shopwalk-woocommerce-ucp
+git clone https://github.com/shopwalk-inc/woocommerce-ucp.git
+cd woocommerce-ucp
 
 # Install dev dependencies (phpcs, qit-cli)
 composer install
@@ -149,7 +149,7 @@ The text domain is `shopwalk-ai`. All user-facing strings must use `__()`, `_e()
 
 ## Reporting Bugs
 
-Open a [GitHub Issue](https://github.com/shopwalk-inc/shopwalk-woocommerce-ucp/issues) using the Bug Report template.
+Open a [GitHub Issue](https://github.com/shopwalk-inc/woocommerce-ucp/issues) using the Bug Report template.
 
 Include:
 - WordPress version
