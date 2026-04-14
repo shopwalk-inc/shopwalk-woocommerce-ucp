@@ -91,27 +91,80 @@ final class Shopwalk_Connector {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Cooldown period in seconds between full syncs.
+	 */
+	private const SYNC_COOLDOWN = 300; // 5 minutes
+
+	/**
+	 * WP option key for tracking sync state.
+	 */
+	private const SYNC_STATE_OPTION = 'shopwalk_sync_state';
+
 	public function ajax_full_sync(): void {
 		check_ajax_referer( 'shopwalk_full_sync', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'shopwalk-ai' ) ), 403 );
 		}
+
+		// Cooldown check — prevent spamming sync requests.
+		$state = (array) get_option( self::SYNC_STATE_OPTION, array() );
+		$last  = (int) ( $state['last_sync_at'] ?? 0 );
+		$now   = time();
+
+		if ( $last > 0 && ( $now - $last ) < self::SYNC_COOLDOWN ) {
+			$remaining = self::SYNC_COOLDOWN - ( $now - $last );
+			wp_send_json_error(
+				array(
+					'message'         => sprintf(
+						/* translators: %d: seconds remaining */
+						__( 'Please wait %d seconds before syncing again.', 'shopwalk-ai' ),
+						$remaining
+					),
+					'cooldown_remaining' => $remaining,
+					'status'             => 'cooldown',
+				),
+				429
+			);
+		}
+
+		// Mark sync as in progress.
+		update_option( self::SYNC_STATE_OPTION, array(
+			'status'       => 'syncing',
+			'last_sync_at' => $now,
+			'started_at'   => $now,
+		), false );
+
 		$sync   = Shopwalk_Sync::instance();
 		$queued = $sync->full_sync();
 
-		// Flush immediately — don't wait for WP-Cron (may never fire on low-traffic sites).
+		// Flush immediately — don't wait for WP-Cron.
+		$batches = 0;
 		while ( count( (array) get_option( 'shopwalk_sync_queue', array() ) ) > 0 ) {
 			$sync->flush();
+			$batches++;
 		}
+
+		// Update sync state.
+		update_option( self::SYNC_STATE_OPTION, array(
+			'status'       => 'complete',
+			'last_sync_at' => $now,
+			'products'     => $queued,
+			'batches'      => $batches,
+			'completed_at' => time(),
+		), false );
 
 		wp_send_json_success(
 			array(
 				'message' => sprintf(
 					/* translators: %d: number of products synced */
-					__( '%d products synced.', 'shopwalk-ai' ),
-					$queued
+					__( '%d products synced in %d batches.', 'shopwalk-ai' ),
+					$queued,
+					$batches
 				),
 				'queued'  => $queued,
+				'batches' => $batches,
+				'status'  => 'complete',
 			)
 		);
 	}

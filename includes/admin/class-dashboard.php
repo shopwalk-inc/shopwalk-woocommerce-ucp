@@ -262,13 +262,41 @@ final class Shopwalk_AI_Admin_Dashboard {
 	// ── Full sync ─────────────────────────────────────────────────────
 	var syncBtn = $('shopwalk-sync-now');
 	if (syncBtn) {
-		syncBtn.addEventListener('click', function () {
+		var syncCooldown = null;
+		function startCooldown(seconds) {
 			syncBtn.disabled = true;
-			syncBtn.textContent = 'Queuing…';
+			var remaining = seconds;
+			function tick() {
+				if (remaining <= 0) {
+					syncBtn.disabled = false;
+					syncBtn.textContent = 'Sync now';
+					syncCooldown = null;
+					return;
+				}
+				syncBtn.textContent = 'Wait ' + remaining + 's';
+				remaining--;
+				syncCooldown = setTimeout(tick, 1000);
+			}
+			tick();
+		}
+		syncBtn.addEventListener('click', function () {
+			if (syncBtn.disabled) return;
+			syncBtn.disabled = true;
+			syncBtn.textContent = 'Syncing…';
 			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
-				syncBtn.disabled = false;
-				syncBtn.textContent = 'Sync now';
-				alert((resp && resp.data && resp.data.message) || 'Done.');
+				if (resp && resp.success) {
+					syncBtn.textContent = (resp.data && resp.data.message) || 'Done!';
+					startCooldown(300);
+				} else {
+					var cd = resp && resp.data && resp.data.cooldown_remaining;
+					if (cd) {
+						startCooldown(cd);
+					} else {
+						syncBtn.disabled = false;
+						syncBtn.textContent = 'Sync now';
+						alert((resp && resp.data && resp.data.message) || 'Sync failed.');
+					}
+				}
 			});
 		});
 	}
