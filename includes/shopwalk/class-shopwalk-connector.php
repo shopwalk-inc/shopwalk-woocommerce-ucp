@@ -94,7 +94,7 @@ final class Shopwalk_Connector {
 	/**
 	 * Cooldown period in seconds between full syncs.
 	 */
-	private const SYNC_COOLDOWN = 300; // 5 minutes
+	private const SYNC_COOLDOWN = 3600; // 1 hour
 
 	/**
 	 * WP option key for tracking sync state.

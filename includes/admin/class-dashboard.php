@@ -273,7 +273,9 @@ final class Shopwalk_AI_Admin_Dashboard {
 					syncCooldown = null;
 					return;
 				}
-				syncBtn.textContent = 'Wait ' + remaining + 's';
+				var mins = Math.floor(remaining / 60);
+				var secs = remaining % 60;
+				syncBtn.textContent = mins > 0 ? 'Wait ' + mins + 'm ' + secs + 's' : 'Wait ' + secs + 's';
 				remaining--;
 				syncCooldown = setTimeout(tick, 1000);
 			}
@@ -286,7 +288,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
 				if (resp && resp.success) {
 					syncBtn.textContent = (resp.data && resp.data.message) || 'Done!';
-					startCooldown(300);
+					startCooldown(3600);
 				} else {
 					var cd = resp && resp.data && resp.data.cooldown_remaining;
 					if (cd) {
