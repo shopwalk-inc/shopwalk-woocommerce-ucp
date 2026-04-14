@@ -241,12 +241,12 @@ final class Shopwalk_Sync {
 				'posts_per_page' => -1,
 			)
 		);
-		$queue = (array) get_option( self::QUEUE_OPTION, array() );
+		// Full sync replaces the queue entirely — no cap.
+		// The cap only applies to incremental webhook events (push_to_queue)
+		// to prevent unbounded growth between flush cycles.
+		$queue = array();
 		foreach ( (array) $pids as $pid ) {
 			$queue[] = array( 'op' => 'upsert', 'product_id' => (int) $pid );
-		}
-		if ( count( $queue ) > self::QUEUE_CAP ) {
-			$queue = array_slice( $queue, -self::QUEUE_CAP );
 		}
 		update_option( self::QUEUE_OPTION, $queue, false );
 		return count( (array) $pids );
