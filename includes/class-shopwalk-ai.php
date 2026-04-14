@@ -106,9 +106,11 @@ final class Shopwalk_AI {
 		require_once $dir . 'class-shopwalk-sync.php';
 		require_once $dir . 'class-shopwalk-connector.php';
 		require_once $dir . 'class-shopwalk-dashboard-panel.php';
+		require_once $dir . 'class-shopwalk-updater.php';
 
 		Shopwalk_Sync::instance();
 		Shopwalk_Connector::instance();
+		new Shopwalk_Updater();
 	}
 
 	/**

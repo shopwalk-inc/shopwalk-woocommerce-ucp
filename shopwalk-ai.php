@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-define( 'SHOPWALK_AI_VERSION', '3.0.0' );
+define( 'SHOPWALK_AI_VERSION', '3.0.3' );
 define( 'SHOPWALK_AI_PLUGIN_FILE', __FILE__ );
 define( 'SHOPWALK_AI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHOPWALK_AI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

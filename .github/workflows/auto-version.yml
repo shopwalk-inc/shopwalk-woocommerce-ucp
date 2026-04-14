@@ -38,7 +38,7 @@ jobs:
         run: |
           NEW="${{ steps.bump.outputs.new_version }}"
           sed -i "s/^ \* Version:.*/ * Version:     ${NEW}/" shopwalk-ai.php
-          sed -i "s/define( 'SHOPWALK_VERSION', '[^']*' )/define( 'SHOPWALK_VERSION', '${NEW}' )/" shopwalk-ai.php
+          sed -i "s/define( 'SHOPWALK_AI_VERSION', '[^']*' )/define( 'SHOPWALK_AI_VERSION', '${NEW}' )/" shopwalk-ai.php
           sed -i "s/^Stable tag:.*/Stable tag: ${NEW}/" readme.txt
 
       - name: Commit and push version bump
