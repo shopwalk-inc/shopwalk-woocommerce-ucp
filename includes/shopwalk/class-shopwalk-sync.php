@@ -62,6 +62,37 @@ final class Shopwalk_Sync {
 		add_action( 'wp_trash_post', array( $this, 'enqueue_trash' ), 10, 1 );
 		add_action( 'before_delete_post', array( $this, 'enqueue_delete' ), 10, 1 );
 		add_action( 'shopwalk_flush_queue', array( $this, 'flush' ) );
+
+		// Handler for the sync trigger endpoint (UCP_Sync_Trigger enqueues this action).
+		// Called by Action Scheduler or wp_schedule_single_event when shopwalk-api or
+		// shopwalk-sync's scheduler triggers a full catalog push.
+		add_action( 'shopwalk_sync_push_products', array( $this, 'handle_push_products' ) );
+	}
+
+	/**
+	 * Handle the shopwalk_sync_push_products action.
+	 *
+	 * Triggered by UCP_Sync_Trigger when shopwalk-api (partner portal sync)
+	 * or shopwalk-sync (periodic scheduler) calls POST /wp-json/ucp/v1/sync/trigger.
+	 *
+	 * Runs full_sync() to queue all products, then immediately flushes the queue
+	 * instead of waiting for the next WP-Cron tick.
+	 *
+	 * @param string $reason The trigger reason (e.g. 'partner_portal', 'scheduled').
+	 * @return void
+	 */
+	public function handle_push_products( $reason = 'triggered' ): void {
+		$count = $this->full_sync();
+
+		// Immediately flush the queue instead of waiting for the 5-minute cron.
+		// This makes "Sync Now" feel instant from the partner portal.
+		while ( count( (array) get_option( self::QUEUE_OPTION, array() ) ) > 0 ) {
+			$this->flush();
+		}
+
+		if ( function_exists( 'error_log' ) ) {
+			error_log( sprintf( '[Shopwalk] Push sync complete: %d products queued and flushed (reason: %s)', $count, $reason ) );
+		}
 	}
 
 	/**
