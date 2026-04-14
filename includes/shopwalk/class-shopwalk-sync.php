@@ -38,9 +38,10 @@ final class Shopwalk_Sync {
 	private const QUEUE_OPTION = 'shopwalk_sync_queue';
 
 	/**
-	 * Max queue size.
+	 * Max queue size — no cap. Every product change is synced.
+	 * shopwalk-sync handles delta detection so unchanged products
+	 * are skipped downstream.
 	 */
-	private const QUEUE_CAP = 500;
 
 	/**
 	 * Get or create the singleton instance.
@@ -138,8 +139,8 @@ final class Shopwalk_Sync {
 	}
 
 	/**
-	 * Push an event onto the queue, dropping the oldest entries if we
-	 * exceed QUEUE_CAP.
+	 * Push an event onto the queue. No cap — every change is synced.
+	 * shopwalk-sync handles delta detection downstream.
 	 *
 	 * @param array{op:string, product_id:int} $event Queue event.
 	 * @return void
@@ -147,9 +148,6 @@ final class Shopwalk_Sync {
 	private function push_to_queue( array $event ): void {
 		$queue = (array) get_option( self::QUEUE_OPTION, array() );
 		$queue[] = $event;
-		if ( count( $queue ) > self::QUEUE_CAP ) {
-			$queue = array_slice( $queue, -self::QUEUE_CAP );
-		}
 		update_option( self::QUEUE_OPTION, $queue, false );
 	}
 
