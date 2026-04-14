@@ -202,18 +202,23 @@ final class Shopwalk_Sync {
 		if ( count( $products ) === 0 ) {
 			return;
 		}
+		// Extract domain from site URL for license domain-binding.
+		$site_url = home_url();
+		$domain   = wp_parse_url( $site_url, PHP_URL_HOST );
+
 		wp_remote_post(
 			SHOPWALK_API_BASE . '/plugin/sync/batch',
 			array(
 				'timeout' => 30,
 				'headers' => array(
-					'Content-Type'    => 'application/json',
+					'Content-Type'     => 'application/json',
 					'X-SW-License-Key' => Shopwalk_License::key(),
-					'User-Agent'      => 'shopwalk-ai-plugin/' . SHOPWALK_AI_VERSION,
+					'X-SW-Domain'      => $domain ? $domain : $site_url,
+					'User-Agent'       => 'shopwalk-ai-plugin/' . SHOPWALK_AI_VERSION,
 				),
 				'body'    => wp_json_encode(
 					array(
-						'site_url' => home_url(),
+						'site_url' => $site_url,
 						'products' => $products,
 					)
 				),
