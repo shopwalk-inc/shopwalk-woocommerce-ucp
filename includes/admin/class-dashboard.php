@@ -288,16 +288,14 @@ final class Shopwalk_AI_Admin_Dashboard {
 			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
 				if (resp && resp.success) {
 					syncBtn.textContent = (resp.data && resp.data.message) || 'Done!';
-					setTimeout(function() { syncBtn.textContent = 'Sync now'; }, 3000);
-				} else {
-					var cd = resp && resp.data && resp.data.cooldown_remaining;
-					if (cd) {
-						startCooldown(cd);
-					} else {
+					setTimeout(function() {
 						syncBtn.disabled = false;
 						syncBtn.textContent = 'Sync now';
-						alert((resp && resp.data && resp.data.message) || 'Sync failed.');
-					}
+					}, 3000);
+				} else {
+					syncBtn.disabled = false;
+					syncBtn.textContent = 'Sync now';
+					alert((resp && resp.data && resp.data.message) || 'Sync failed.');
 				}
 			});
 		});

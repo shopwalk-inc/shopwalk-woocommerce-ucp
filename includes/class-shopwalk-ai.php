@@ -50,10 +50,22 @@ final class Shopwalk_AI {
 	 */
 	private function __construct() {
 		$this->load_core();
+		$this->load_updater(); // Always load — updates must work even without a license
 		if ( $this->is_shopwalk_connected() ) {
 			$this->load_shopwalk();
 		}
 		$this->load_admin();
+	}
+
+	/**
+	 * Load the auto-updater. Runs unconditionally — a store must be able to
+	 * receive plugin updates regardless of license/connection status.
+	 *
+	 * @return void
+	 */
+	private function load_updater(): void {
+		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-updater.php';
+		new Shopwalk_Updater();
 	}
 
 	/**
@@ -106,11 +118,9 @@ final class Shopwalk_AI {
 		require_once $dir . 'class-shopwalk-sync.php';
 		require_once $dir . 'class-shopwalk-connector.php';
 		require_once $dir . 'class-shopwalk-dashboard-panel.php';
-		require_once $dir . 'class-shopwalk-updater.php';
 
 		Shopwalk_Sync::instance();
 		Shopwalk_Connector::instance();
-		new Shopwalk_Updater();
 
 		// Auto-activate prefilled license if pending (set during plugin activation
 		// hook when Shopwalk_License wasn't loaded yet).
