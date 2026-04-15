@@ -180,7 +180,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 					<?php if ( $api_error ) : ?>
 						— <?php echo esc_html( $api_error ); ?>
 					<?php endif; ?>
-					<br>Sync counts may be stale. Please try again later.
+					<br>Sync counts may be stale. Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.
 				</div>
 			<?php endif; ?>
 
@@ -394,7 +394,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 					var html = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;">';
 					html += '<strong>Cannot reach Shopwalk API</strong> — ' + esc(errMsg) + '<br><br>';
 					html += 'This means the Shopwalk platform is temporarily unavailable. Your store and products are not affected.<br>';
-					html += 'Please try again in a few minutes.';
+					html += 'Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again in a few minutes.';
 					html += '</div>';
 					out.innerHTML = html;
 					return;
