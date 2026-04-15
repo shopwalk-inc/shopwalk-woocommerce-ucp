@@ -449,10 +449,38 @@ final class Shopwalk_AI_Admin_Dashboard {
 					return;
 				}
 				var html = '<strong>Local Self-Test</strong>';
+				var hasFail = false;
+				var failMessages = [];
 				(resp.data.checks || []).forEach(function (c) {
 					var icon = c.status === 'pass' ? '✅' : c.status === 'warn' ? '⚠️' : '❌';
 					html += '<div class="sw-check-row"><span>' + icon + ' ' + esc(c.check) + '</span><span class="sw-muted">' + esc(c.message) + '</span></div>';
+					if (c.status === 'fail') {
+						hasFail = true;
+						failMessages.push(c.check + ': ' + c.message);
+					}
 				});
+
+				if (hasFail) {
+					var h = resp.data.host || {};
+					html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;">';
+					html += '<strong>Server issues detected</strong> — these require changes by your hosting provider.<br><br>';
+					if (h.name) {
+						html += '<strong>Your host: ' + esc(h.name) + '</strong><br>';
+						html += 'Contact them and ask to resolve:<br>';
+						html += '<ul style="margin:4px 0 8px 16px;">';
+						failMessages.forEach(function (m) { html += '<li>' + esc(m) + '</li>'; });
+						html += '</ul>';
+						if (h.phone) html += 'Phone: <strong>' + esc(h.phone) + '</strong><br>';
+						if (h.support) html += 'Support: <strong>' + esc(h.support) + '</strong><br>';
+					} else {
+						html += 'Contact your hosting provider and ask them to resolve:<br>';
+						html += '<ul style="margin:4px 0 0 16px;">';
+						failMessages.forEach(function (m) { html += '<li>' + esc(m) + '</li>'; });
+						html += '</ul>';
+					}
+					html += '</div>';
+				}
+
 				out.innerHTML = html;
 			});
 		});
@@ -666,7 +694,58 @@ JS;
 			'message' => $loop_code === 200 ? 'WordPress can reach its own REST API' : 'Failed — loopback blocked (HTTP ' . $loop_code . ')',
 		);
 
-		wp_send_json_success( array( 'checks' => $checks ) );
+		// Detect hosting provider for support CTA
+		$host_info = $this->detect_hosting();
+
+		wp_send_json_success( array( 'checks' => $checks, 'host' => $host_info ) );
+	}
+
+	/**
+	 * Detect the hosting provider from server environment.
+	 */
+	private function detect_hosting(): array {
+		$server_sw = $_SERVER['SERVER_SOFTWARE'] ?? '';
+		$hostname  = gethostname() ?: '';
+		$server_ip = $_SERVER['SERVER_ADDR'] ?? '';
+
+		// Check known hosting signatures
+		$hosts = array(
+			'bluehost'    => array( 'name' => 'Bluehost',          'phone' => '1-888-401-4678', 'support' => 'bluehost.com/support' ),
+			'siteground'  => array( 'name' => 'SiteGround',        'phone' => '1-800-828-9231', 'support' => 'siteground.com/support' ),
+			'hostgator'   => array( 'name' => 'HostGator',         'phone' => '1-866-964-2867', 'support' => 'hostgator.com/support' ),
+			'godaddy'     => array( 'name' => 'GoDaddy',           'phone' => '1-480-505-8877', 'support' => 'godaddy.com/help' ),
+			'dreamhost'   => array( 'name' => 'DreamHost',         'phone' => '1-714-706-4182', 'support' => 'dreamhost.com/support' ),
+			'wpengine'    => array( 'name' => 'WP Engine',         'phone' => '1-877-973-6446', 'support' => 'wpengine.com/support' ),
+			'kinsta'      => array( 'name' => 'Kinsta',            'phone' => '',                'support' => 'kinsta.com/support' ),
+			'cloudways'   => array( 'name' => 'Cloudways',         'phone' => '',                'support' => 'cloudways.com/support' ),
+			'flywheel'    => array( 'name' => 'Flywheel',          'phone' => '',                'support' => 'getflywheel.com/support' ),
+			'namecheap'   => array( 'name' => 'Namecheap',         'phone' => '1-888-401-4678', 'support' => 'namecheap.com/support' ),
+			'inmotionhosting' => array( 'name' => 'InMotion Hosting', 'phone' => '1-888-321-HOST', 'support' => 'inmotionhosting.com/support' ),
+			'liquidweb'   => array( 'name' => 'Liquid Web',        'phone' => '1-800-580-4985', 'support' => 'liquidweb.com/support' ),
+			'a2hosting'   => array( 'name' => 'A2 Hosting',        'phone' => '1-888-546-8946', 'support' => 'a2hosting.com/support' ),
+		);
+
+		$search = strtolower( $server_sw . ' ' . $hostname . ' ' . $server_ip . ' ' . ( $_SERVER['DOCUMENT_ROOT'] ?? '' ) );
+		foreach ( $hosts as $key => $info ) {
+			if ( strpos( $search, $key ) !== false ) {
+				return $info;
+			}
+		}
+
+		// Try reverse DNS on server IP
+		if ( $server_ip ) {
+			$rdns = gethostbyaddr( $server_ip );
+			if ( $rdns && $rdns !== $server_ip ) {
+				$rdns_lower = strtolower( $rdns );
+				foreach ( $hosts as $key => $info ) {
+					if ( strpos( $rdns_lower, $key ) !== false ) {
+						return $info;
+					}
+				}
+			}
+		}
+
+		return array( 'name' => '', 'phone' => '', 'support' => '' );
 	}
 
 	public function ajax_probe(): void {
