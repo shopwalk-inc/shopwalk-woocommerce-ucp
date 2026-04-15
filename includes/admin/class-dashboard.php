@@ -29,6 +29,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 		add_action( 'wp_ajax_shopwalk_activate', array( $this, 'ajax_activate' ) );
 		add_action( 'wp_ajax_shopwalk_test_license', array( $this, 'ajax_test_license' ) );
 		add_action( 'wp_ajax_shopwalk_disconnect', array( $this, 'ajax_disconnect' ) );
+		add_action( 'wp_ajax_shopwalk_sync_status', array( $this, 'ajax_sync_status' ) );
 	}
 
 	public function register_menu(): void {
@@ -60,6 +61,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 					'test_license' => wp_create_nonce( 'shopwalk_test_license' ),
 					'disconnect'   => wp_create_nonce( 'shopwalk_disconnect' ),
 					'full_sync'    => wp_create_nonce( 'shopwalk_full_sync' ),
+					'sync_status'  => wp_create_nonce( 'shopwalk_sync_status' ),
 				),
 			) ) . ';' . $this->admin_js()
 		);
@@ -139,69 +141,15 @@ final class Shopwalk_AI_Admin_Dashboard {
 	// ── Sync Tool ──────────────────────────────────────────────────────────
 
 	private function render_sync_tool( string $tier ): void {
-		$product_count = wp_count_posts( 'product' )->publish ?? 0;
-		$interval      = $tier === 'pro' ? '6 hours (Pro)' : '24 hours';
-
-		// Fetch sync counts from shopwalk-api (source of truth)
-		$synced_count  = 0;
-		$catalog_count = 0;
-		$api_reachable = false;
-		$api_error     = '';
-		$license_key   = get_option( 'shopwalk_license_key', '' );
-		if ( $license_key ) {
-			$api_url  = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
-			$response = wp_remote_get( $api_url . '/api/v1/plugin/pro/status', array(
-				'headers' => array(
-					'X-SW-License-Key' => $license_key,
-					'X-SW-Domain'      => home_url(),
-				),
-				'timeout' => 5,
-			) );
-			if ( is_wp_error( $response ) ) {
-				$api_error = $response->get_error_message();
-			} elseif ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
-				$api_error = 'HTTP ' . wp_remote_retrieve_response_code( $response );
-			} else {
-				$api_reachable = true;
-				$body = json_decode( wp_remote_retrieve_body( $response ), true );
-				if ( $body ) {
-					$synced_count  = (int) ( $body['synced_count'] ?? $body['embedding_count'] ?? 0 );
-					$catalog_count = (int) ( $body['catalog_count'] ?? 0 );
-				}
-			}
-		}
+		$local_count = wp_count_posts( 'product' )->publish ?? 0;
+		$interval    = $tier === 'pro' ? '6 hours (Pro)' : '24 hours';
 		?>
 		<div class="sw-card">
 			<h2><?php esc_html_e( 'Sync Tool', 'shopwalk-ai' ); ?></h2>
 
-			<?php if ( ! $api_reachable && $license_key ) : ?>
-				<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-bottom:12px;font-size:13px;">
-					<strong>Cannot reach Shopwalk API</strong>
-					<?php if ( $api_error ) : ?>
-						— <?php echo esc_html( $api_error ); ?>
-					<?php endif; ?>
-					<br>Sync counts may be stale. Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.
-				</div>
-			<?php endif; ?>
-
-			<div class="sw-stats">
-				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( number_format( $product_count ) ); ?></div>
-					<div class="sw-stat-label"><?php esc_html_e( 'WooCommerce', 'shopwalk-ai' ); ?></div>
-				</div>
-				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( $api_reachable ? number_format( $synced_count ) : '—' ); ?></div>
-					<div class="sw-stat-label"><?php esc_html_e( 'Synced', 'shopwalk-ai' ); ?></div>
-				</div>
-				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( $api_reachable ? number_format( max( 0, $product_count - $synced_count ) ) : '—' ); ?></div>
-					<div class="sw-stat-label"><?php esc_html_e( 'Pending', 'shopwalk-ai' ); ?></div>
-				</div>
+			<div id="sw-sync-info">
+				<p class="sw-muted">Loading sync status...</p>
 			</div>
-
-			<table class="sw-details">
-				<tr><td><?php esc_html_e( 'Sync interval', 'shopwalk-ai' ); ?></td><td><?php echo esc_html( $interval ); ?></td></tr>
-			</table>
 
 			<div id="sw-sync-progress" style="display:none;">
 				<div class="sw-progress-bar"><div class="sw-progress-fill" id="sw-progress-fill"></div></div>
@@ -214,18 +162,6 @@ final class Shopwalk_AI_Admin_Dashboard {
 				</button>
 				<span class="sw-muted" id="sw-cooldown-text"></span>
 			</p>
-
-			<?php if ( ! empty( $history ) ) : ?>
-				<h3><?php esc_html_e( 'Sync History', 'shopwalk-ai' ); ?></h3>
-				<table class="sw-details">
-					<?php foreach ( array_slice( $history, 0, 5 ) as $entry ) : ?>
-						<tr>
-							<td><?php echo esc_html( wp_date( 'M j, H:i', (int) ( $entry['timestamp'] ?? 0 ) ) ); ?></td>
-							<td><?php echo esc_html( ( $entry['type'] ?? 'full' ) . ' · ' . ( $entry['total'] ?? 0 ) . ' products' ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-				</table>
-			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -574,6 +510,70 @@ final class Shopwalk_AI_Admin_Dashboard {
 		});
 	}
 
+	// ── Sync Status (loaded from API) ──────────────────────────────────
+	var syncInfo = $('sw-sync-info');
+	var syncPollTimer = null;
+
+	function renderSyncInfo(sync, localCount) {
+		if (!syncInfo) return;
+		var st = sync || {};
+		var synced = st.synced_count || 0;
+		var total = st.product_count || 0;
+		var status = st.status || 'never';
+		var pct = st.progress_pct || 0;
+		var lastSync = st.last_synced_at ? new Date(st.last_synced_at).toLocaleString() : 'Never';
+
+		var html = '<div class="sw-stats">';
+		html += '<div class="sw-stat"><div class="sw-stat-value">' + (localCount || 0).toLocaleString() + '</div><div class="sw-stat-label">WooCommerce</div></div>';
+		html += '<div class="sw-stat"><div class="sw-stat-value">' + synced.toLocaleString() + '</div><div class="sw-stat-label">Synced</div></div>';
+		html += '<div class="sw-stat"><div class="sw-stat-value">' + Math.max(0, (total || localCount) - synced).toLocaleString() + '</div><div class="sw-stat-label">Pending</div></div>';
+		html += '</div>';
+
+		html += '<table class="sw-details">';
+		html += '<tr><td>Status</td><td>' + esc(status === 'complete' ? 'Complete' : status === 'syncing' ? 'Syncing (' + pct + '%)' : status === 'never' ? 'Never synced' : status) + '</td></tr>';
+		html += '<tr><td>Last synced</td><td>' + esc(lastSync) + '</td></tr>';
+		html += '</table>';
+
+		if (status === 'syncing') {
+			var prog = $('sw-sync-progress');
+			var fill = $('sw-progress-fill');
+			if (prog && fill) {
+				prog.style.display = 'block';
+				fill.style.width = pct + '%';
+			}
+		}
+
+		syncInfo.innerHTML = html;
+	}
+
+	function loadSyncStatus() {
+		postAjax('shopwalk_sync_status', { nonce: s.nonces.sync_status }).then(function (resp) {
+			if (!resp || !resp.success) {
+				if (syncInfo) {
+					syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Cannot reach Shopwalk API</strong><br>Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.</div>';
+				}
+				return;
+			}
+			var d = resp.data;
+			renderSyncInfo(d.sync, d.local_count);
+
+			// If syncing, poll every 5 seconds for progress
+			if (d.sync && d.sync.status === 'syncing') {
+				if (!syncPollTimer) {
+					syncPollTimer = setInterval(loadSyncStatus, 5000);
+				}
+			} else {
+				if (syncPollTimer) {
+					clearInterval(syncPollTimer);
+					syncPollTimer = null;
+				}
+			}
+		});
+	}
+
+	// Load on page load
+	loadSyncStatus();
+
 	// ── Sync Now ────────────────────────────────────────────────────────
 	var syncBtn = $('shopwalk-sync-now');
 	if (syncBtn) {
@@ -584,11 +584,15 @@ final class Shopwalk_AI_Admin_Dashboard {
 
 			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
 				if (resp && resp.success) {
-					syncBtn.textContent = (resp.data && resp.data.message) || 'Done!';
+					syncBtn.textContent = (resp.data && resp.data.message) || 'Sync started!';
+					// Start polling for progress
+					if (!syncPollTimer) {
+						syncPollTimer = setInterval(loadSyncStatus, 5000);
+					}
 					setTimeout(function () {
 						syncBtn.disabled = false;
 						syncBtn.textContent = 'Sync Now';
-					}, 3000);
+					}, 5000);
 				} else {
 					syncBtn.disabled = false;
 					syncBtn.textContent = 'Sync Now';
@@ -773,6 +777,39 @@ JS;
 		}
 
 		return array( 'name' => '', 'phone' => '', 'support' => '' );
+	}
+
+	public function ajax_sync_status(): void {
+		check_ajax_referer( 'shopwalk_sync_status', 'nonce' );
+
+		$license_key = get_option( 'shopwalk_license_key', '' );
+		if ( ! $license_key ) {
+			wp_send_json_error( array( 'message' => 'No license key configured.' ) );
+		}
+
+		$api_url  = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
+		$response = wp_remote_get( $api_url . '/api/v1/plugin/pro/status', array(
+			'headers' => array(
+				'X-SW-License-Key' => $license_key,
+				'X-SW-Domain'      => home_url(),
+			),
+			'timeout' => 5,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( array( 'message' => $response->get_error_message() ) );
+		}
+		if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			wp_send_json_error( array( 'message' => 'HTTP ' . wp_remote_retrieve_response_code( $response ) ) );
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		$local_count = (int) ( wp_count_posts( 'product' )->publish ?? 0 );
+
+		wp_send_json_success( array(
+			'sync'        => $body['sync'] ?? array(),
+			'local_count' => $local_count,
+		) );
 	}
 
 	public function ajax_probe(): void {
