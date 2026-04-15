@@ -245,7 +245,6 @@ final class Shopwalk_AI_Admin_Dashboard {
 							<li><?php esc_html_e( 'Gap Analysis — discover what shoppers search for that you don\'t carry', 'shopwalk-ai' ); ?></li>
 							<li><?php esc_html_e( 'Priority Support — phone + email support', 'shopwalk-ai' ); ?></li>
 						</ul>
-						<p class="sw-muted" style="margin-bottom:12px;"><?php esc_html_e( '$19/mo billed annually · $29/mo billed monthly', 'shopwalk-ai' ); ?></p>
 						<p>
 							<a href="<?php echo esc_url( SHOPWALK_PARTNERS_URL . '/upgrade' ); ?>" class="button button-primary" target="_blank" rel="noopener">
 								<?php esc_html_e( 'Upgrade to Pro →', 'shopwalk-ai' ); ?>
