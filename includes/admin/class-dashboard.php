@@ -397,16 +397,33 @@ final class Shopwalk_AI_Admin_Dashboard {
 				} else {
 					html += '<div class="sw-check-row"><span>❌ ' + esc(d.reason || 'Unreachable') + '</span></div>';
 					html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;">';
-					html += '<strong>⚠️ Shopwalk cannot reach your store.</strong><br>';
-					html += 'Common fixes:<br>';
-					html += '• Whitelist Shopwalk IP: 15.204.101.254<br>';
-					html += '• Check .htaccess for blocking rules<br>';
-					html += '• Ensure permalinks are not set to "Plain"<br><br>';
-					html += '<a href="mailto:support@shopwalk.com?subject=UCP%20connectivity%20issue&body=Store:%20' + encodeURIComponent(location.origin) + '" class="button">Contact Support</a>';
+					html += '<strong>Shopwalk cannot reach your store.</strong><br><br>';
+
+					if (d.host_name) {
+						html += '<strong>Your hosting provider: ' + esc(d.host_name) + '</strong><br><br>';
+						html += 'Call your host and ask them to:<br>';
+						html += '• Whitelist this IP address: <strong>15.204.101.254</strong><br>';
+						html += '• Whitelist this User-Agent: <strong>Shopwalk-AI-Shopping</strong><br>';
+						html += '• Ensure the REST API path <strong>/wp-json/ucp/v1/</strong> is not blocked by WAF or ModSecurity rules<br><br>';
+						html += '<strong>What to say:</strong> "I have a WordPress plugin that uses the REST API. An external service at IP 15.204.101.254 needs to reach my site\'s /wp-json/ endpoints. Can you whitelist this IP and make sure no firewall or ModSecurity rule is blocking it?"<br><br>';
+						if (d.host_phone) {
+							html += 'Phone: <strong>' + esc(d.host_phone) + '</strong><br>';
+						}
+						if (d.host_support) {
+							html += 'Support: <strong>' + esc(d.host_support) + '</strong><br>';
+						}
+					} else {
+						html += 'Your hosting provider could not be detected. Contact your host and ask them to:<br>';
+						html += '• Whitelist IP: <strong>15.204.101.254</strong><br>';
+						html += '• Whitelist User-Agent: <strong>Shopwalk-AI-Shopping</strong><br>';
+						html += '• Ensure <strong>/wp-json/ucp/v1/</strong> is not blocked by firewall rules<br>';
+					}
 					html += '</div>';
 				}
 				if (d.host_name) {
-					html += '<div class="sw-check-row"><span>ℹ️ Hosting: ' + esc(d.host_name) + '</span></div>';
+					html += '<div class="sw-check-row"><span>Hosting: ' + esc(d.host_name) + '</span>';
+					if (d.host_phone) html += '<span class="sw-muted">' + esc(d.host_phone) + '</span>';
+					html += '</div>';
 				}
 				if (d.ucp_version) {
 					html += '<p class="sw-muted">UCP v' + esc(d.ucp_version) + (d.plugin_version ? ' · Plugin v' + esc(d.plugin_version) : '') + '</p>';
