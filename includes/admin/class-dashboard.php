@@ -513,6 +513,18 @@ final class Shopwalk_AI_Admin_Dashboard {
 	// ── Sync Status (loaded from API) ──────────────────────────────────
 	var syncInfo = $('sw-sync-info');
 	var syncPollTimer = null;
+	var syncBtn = $('shopwalk-sync-now');
+
+	function updateSyncButton(status) {
+		if (!syncBtn) return;
+		if (status === 'syncing') {
+			syncBtn.disabled = true;
+			syncBtn.textContent = 'Syncing\u2026';
+		} else {
+			syncBtn.disabled = false;
+			syncBtn.textContent = 'Sync Now';
+		}
+	}
 
 	function renderSyncInfo(sync, localCount) {
 		if (!syncInfo) return;
@@ -534,16 +546,17 @@ final class Shopwalk_AI_Admin_Dashboard {
 		html += '<tr><td>Last synced</td><td>' + esc(lastSync) + '</td></tr>';
 		html += '</table>';
 
-		if (status === 'syncing') {
-			var prog = $('sw-sync-progress');
-			var fill = $('sw-progress-fill');
-			if (prog && fill) {
-				prog.style.display = 'block';
-				fill.style.width = pct + '%';
-			}
+		var prog = $('sw-sync-progress');
+		var fill = $('sw-progress-fill');
+		if (status === 'syncing' && prog && fill) {
+			prog.style.display = 'block';
+			fill.style.width = pct + '%';
+		} else if (prog) {
+			prog.style.display = 'none';
 		}
 
 		syncInfo.innerHTML = html;
+		updateSyncButton(status);
 	}
 
 	function loadSyncStatus() {
@@ -552,17 +565,20 @@ final class Shopwalk_AI_Admin_Dashboard {
 				if (syncInfo) {
 					syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Cannot reach Shopwalk API</strong><br>Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.</div>';
 				}
+				updateSyncButton('error');
 				return;
 			}
 			var d = resp.data;
+			var status = d.sync && d.sync.status || 'never';
 			renderSyncInfo(d.sync, d.local_count);
 
-			// If syncing, poll every 5 seconds for progress
-			if (d.sync && d.sync.status === 'syncing') {
+			if (status === 'syncing') {
+				// Poll every 60 seconds while syncing
 				if (!syncPollTimer) {
-					syncPollTimer = setInterval(loadSyncStatus, 5000);
+					syncPollTimer = setInterval(loadSyncStatus, 60000);
 				}
 			} else {
+				// Sync finished — stop polling, re-enable button
 				if (syncPollTimer) {
 					clearInterval(syncPollTimer);
 					syncPollTimer = null;
@@ -575,24 +591,20 @@ final class Shopwalk_AI_Admin_Dashboard {
 	loadSyncStatus();
 
 	// ── Sync Now ────────────────────────────────────────────────────────
-	var syncBtn = $('shopwalk-sync-now');
 	if (syncBtn) {
 		syncBtn.addEventListener('click', function () {
 			if (syncBtn.disabled) return;
 			syncBtn.disabled = true;
-			syncBtn.textContent = 'Syncing…';
+			syncBtn.textContent = 'Syncing\u2026';
 
 			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
 				if (resp && resp.success) {
-					syncBtn.textContent = (resp.data && resp.data.message) || 'Sync started!';
-					// Start polling for progress
+					// Start polling — button stays disabled until sync completes
 					if (!syncPollTimer) {
-						syncPollTimer = setInterval(loadSyncStatus, 5000);
+						syncPollTimer = setInterval(loadSyncStatus, 60000);
 					}
-					setTimeout(function () {
-						syncBtn.disabled = false;
-						syncBtn.textContent = 'Sync Now';
-					}, 5000);
+					// Do an immediate status check after a short delay
+					setTimeout(loadSyncStatus, 3000);
 				} else {
 					syncBtn.disabled = false;
 					syncBtn.textContent = 'Sync Now';
