@@ -30,7 +30,7 @@ final class Shopwalk_Sync {
 	/**
 	 * Batch size for API pushes.
 	 */
-	private const BATCH_SIZE = 25;
+	private const BATCH_SIZE = 100;
 
 	/**
 	 * Queue option name.
