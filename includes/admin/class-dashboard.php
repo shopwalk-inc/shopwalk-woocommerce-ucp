@@ -60,7 +60,6 @@ final class Shopwalk_AI_Admin_Dashboard {
 					'activate'     => wp_create_nonce( 'shopwalk_activate' ),
 					'test_license' => wp_create_nonce( 'shopwalk_test_license' ),
 					'disconnect'   => wp_create_nonce( 'shopwalk_disconnect' ),
-					'full_sync'    => wp_create_nonce( 'shopwalk_full_sync' ),
 					'sync_status'  => wp_create_nonce( 'shopwalk_sync_status' ),
 				),
 			) ) . ';' . $this->admin_js()
@@ -141,26 +140,18 @@ final class Shopwalk_AI_Admin_Dashboard {
 	// ── Sync Tool ──────────────────────────────────────────────────────────
 
 	private function render_sync_tool( string $tier ): void {
-		$local_count = wp_count_posts( 'product' )->publish ?? 0;
-		$interval    = $tier === 'pro' ? '6 hours (Pro)' : '24 hours';
 		?>
 		<div class="sw-card">
-			<h2><?php esc_html_e( 'Sync Tool', 'shopwalk-ai' ); ?></h2>
+			<h2><?php esc_html_e( 'Sync Status', 'shopwalk-ai' ); ?></h2>
 
 			<div id="sw-sync-info">
 				<p class="sw-muted">Loading sync status...</p>
 			</div>
 
-			<div id="sw-sync-progress" style="display:none;">
-				<div class="sw-progress-bar"><div class="sw-progress-fill" id="sw-progress-fill"></div></div>
-				<p class="sw-muted" id="sw-sync-status-text"></p>
-			</div>
-
 			<p>
-				<button type="button" class="button button-primary" id="shopwalk-sync-now">
-					<?php esc_html_e( 'Sync Now', 'shopwalk-ai' ); ?>
-				</button>
-				<span class="sw-muted" id="sw-cooldown-text"></span>
+				<a href="https://shopwalk.com/partners/products" target="_blank" class="button button-primary">
+					<?php esc_html_e( 'Manage Sync in Partner Portal', 'shopwalk-ai' ); ?>
+				</a>
 			</p>
 		</div>
 		<?php
@@ -510,110 +501,40 @@ final class Shopwalk_AI_Admin_Dashboard {
 		});
 	}
 
-	// ── Sync Status (loaded from API) ──────────────────────────────────
+	// ── Sync Status (loaded from API on page load) ────────────────────
 	var syncInfo = $('sw-sync-info');
-	var syncPollTimer = null;
-	var syncBtn = $('shopwalk-sync-now');
-
-	function updateSyncButton(status) {
-		if (!syncBtn) return;
-		if (status === 'syncing') {
-			syncBtn.disabled = true;
-			syncBtn.textContent = 'Syncing\u2026';
-		} else {
-			syncBtn.disabled = false;
-			syncBtn.textContent = 'Sync Now';
-		}
-	}
-
-	function renderSyncInfo(sync, localCount) {
-		if (!syncInfo) return;
-		var st = sync || {};
-		var synced = st.synced_count || 0;
-		var total = st.product_count || 0;
-		var status = st.status || 'never';
-		var pct = st.progress_pct || 0;
-		var lastSync = st.last_synced_at ? new Date(st.last_synced_at).toLocaleString() : 'Never';
-
-		var html = '<div class="sw-stats">';
-		html += '<div class="sw-stat"><div class="sw-stat-value">' + (localCount || 0).toLocaleString() + '</div><div class="sw-stat-label">WooCommerce</div></div>';
-		html += '<div class="sw-stat"><div class="sw-stat-value">' + synced.toLocaleString() + '</div><div class="sw-stat-label">Synced</div></div>';
-		html += '<div class="sw-stat"><div class="sw-stat-value">' + Math.max(0, (total || localCount) - synced).toLocaleString() + '</div><div class="sw-stat-label">Pending</div></div>';
-		html += '</div>';
-
-		html += '<table class="sw-details">';
-		html += '<tr><td>Status</td><td>' + esc(status === 'complete' ? 'Complete' : status === 'syncing' ? 'Syncing (' + pct + '%)' : status === 'never' ? 'Never synced' : status) + '</td></tr>';
-		html += '<tr><td>Last synced</td><td>' + esc(lastSync) + '</td></tr>';
-		html += '</table>';
-
-		var prog = $('sw-sync-progress');
-		var fill = $('sw-progress-fill');
-		if (status === 'syncing' && prog && fill) {
-			prog.style.display = 'block';
-			fill.style.width = pct + '%';
-		} else if (prog) {
-			prog.style.display = 'none';
-		}
-
-		syncInfo.innerHTML = html;
-		updateSyncButton(status);
-	}
 
 	function loadSyncStatus() {
+		if (!syncInfo) return;
 		postAjax('shopwalk_sync_status', { nonce: s.nonces.sync_status }).then(function (resp) {
 			if (!resp || !resp.success) {
-				if (syncInfo) {
-					syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Cannot reach Shopwalk API</strong><br>Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.</div>';
-				}
-				updateSyncButton('error');
+				syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Cannot reach Shopwalk API</strong><br>Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.</div>';
 				return;
 			}
 			var d = resp.data;
-			var status = d.sync && d.sync.status || 'never';
-			renderSyncInfo(d.sync, d.local_count);
+			var st = d.sync || {};
+			var synced = st.synced_count || 0;
+			var total = st.product_count || 0;
+			var status = st.status || 'never';
+			var lastSync = st.last_synced_at ? new Date(st.last_synced_at).toLocaleString() : 'Never';
 
-			if (status === 'syncing') {
-				// Poll every 60 seconds while syncing
-				if (!syncPollTimer) {
-					syncPollTimer = setInterval(loadSyncStatus, 60000);
-				}
-			} else {
-				// Sync finished — stop polling, re-enable button
-				if (syncPollTimer) {
-					clearInterval(syncPollTimer);
-					syncPollTimer = null;
-				}
-			}
+			var statusLabel = status === 'complete' ? 'Complete' : status === 'syncing' ? 'Syncing' : 'Never synced';
+
+			var html = '<div class="sw-stats">';
+			html += '<div class="sw-stat"><div class="sw-stat-value">' + (d.local_count || 0).toLocaleString() + '</div><div class="sw-stat-label">WooCommerce</div></div>';
+			html += '<div class="sw-stat"><div class="sw-stat-value">' + synced.toLocaleString() + '</div><div class="sw-stat-label">Synced</div></div>';
+			html += '</div>';
+
+			html += '<table class="sw-details">';
+			html += '<tr><td>Status</td><td>' + esc(statusLabel) + '</td></tr>';
+			html += '<tr><td>Last synced</td><td>' + esc(lastSync) + '</td></tr>';
+			html += '</table>';
+
+			syncInfo.innerHTML = html;
 		});
 	}
 
-	// Load on page load
 	loadSyncStatus();
-
-	// ── Sync Now ────────────────────────────────────────────────────────
-	if (syncBtn) {
-		syncBtn.addEventListener('click', function () {
-			if (syncBtn.disabled) return;
-			syncBtn.disabled = true;
-			syncBtn.textContent = 'Syncing\u2026';
-
-			postAjax('shopwalk_full_sync', { nonce: s.nonces.full_sync }).then(function (resp) {
-				if (resp && resp.success) {
-					// Start polling — button stays disabled until sync completes
-					if (!syncPollTimer) {
-						syncPollTimer = setInterval(loadSyncStatus, 60000);
-					}
-					// Do an immediate status check after a short delay
-					setTimeout(loadSyncStatus, 3000);
-				} else {
-					syncBtn.disabled = false;
-					syncBtn.textContent = 'Sync Now';
-					var msg = resp && resp.data && resp.data.message || 'Sync failed.';
-					alert(msg);
-				}
-			});
-		});
-	}
 })();
 JS;
 	}
