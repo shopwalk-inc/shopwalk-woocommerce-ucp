@@ -100,6 +100,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 			</h1>
 
 			<?php $this->render_styles(); ?>
+			<div id="sw-status-banner"></div>
 			<?php $this->render_ucp_tool( $tier ); ?>
 			<?php if ( $tier !== 'unlicensed' ) : ?>
 				<?php $this->render_sync_tool( $tier ); ?>
@@ -549,6 +550,24 @@ final class Shopwalk_AI_Admin_Dashboard {
 	}
 
 	loadSyncStatus();
+
+	// ── Status Banner (from Shopwalk API) ───────────────────────────────
+	var bannerEl = $('sw-status-banner');
+	if (bannerEl) {
+		fetch('https://api.shopwalk.com/api/v1/status/banner')
+			.then(function (r) { return r.json(); })
+			.then(function (d) {
+				if (!d || !d.active || !d.message) return;
+				var colors = {
+					maintenance: { bg: '#eff6ff', border: '#bfdbfe', icon: '🔧' },
+					warning:     { bg: '#fefce8', border: '#fef08a', icon: '⚠️' },
+					info:        { bg: '#f0f9ff', border: '#bae6fd', icon: 'ℹ️' }
+				};
+				var c = colors[d.type] || colors.info;
+				bannerEl.innerHTML = '<div style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px;">' + c.icon + ' ' + esc(d.message) + ' <a href="https://shopwalk.com/status" target="_blank" style="margin-left:8px;">View status →</a></div>';
+			})
+			.catch(function () {});
+	}
 })();
 JS;
 	}
