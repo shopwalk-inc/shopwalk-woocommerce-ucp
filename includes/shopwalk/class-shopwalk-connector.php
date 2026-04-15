@@ -145,14 +145,29 @@ final class Shopwalk_Connector {
 			$batches++;
 		}
 
+		$completed = time();
+
 		// Update sync state.
 		update_option( self::SYNC_STATE_OPTION, array(
 			'status'       => 'complete',
 			'last_sync_at' => $now,
 			'products'     => $queued,
 			'batches'      => $batches,
-			'completed_at' => time(),
+			'completed_at' => $completed,
 		), false );
+
+		// Append to sync history (keep last 10).
+		$history   = (array) get_option( 'shopwalk_sync_history', array() );
+		$history[] = array(
+			'timestamp' => $completed,
+			'type'      => 'full',
+			'total'     => $queued,
+			'batches'   => $batches,
+		);
+		if ( count( $history ) > 10 ) {
+			$history = array_slice( $history, -10 );
+		}
+		update_option( 'shopwalk_sync_history', $history, false );
 
 		wp_send_json_success(
 			array(
