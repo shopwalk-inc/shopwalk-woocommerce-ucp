@@ -140,14 +140,29 @@ final class Shopwalk_AI_Admin_Dashboard {
 
 	private function render_sync_tool( string $tier ): void {
 		$product_count = wp_count_posts( 'product' )->publish ?? 0;
-		$state         = (array) get_option( 'shopwalk_sync_state', array() );
-		$queue         = (array) get_option( 'shopwalk_sync_queue', array() );
-		$history       = (array) get_option( 'shopwalk_sync_history', array() );
-		$last_sync     = ! empty( $state['completed_at'] ) ? human_time_diff( (int) $state['completed_at'] ) . ' ago' : 'Never';
-		$last_products = $state['products'] ?? 0;
-		$last_batches  = $state['batches'] ?? 0;
 		$interval      = $tier === 'pro' ? '6 hours (Pro)' : '24 hours';
-		$queue_count   = count( $queue );
+
+		// Fetch sync counts from shopwalk-api (source of truth)
+		$synced_count = 0;
+		$catalog_count = 0;
+		$license_key = get_option( 'shopwalk_license_key', '' );
+		if ( $license_key ) {
+			$api_url  = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
+			$response = wp_remote_get( $api_url . '/api/v1/plugin/pro/status', array(
+				'headers' => array(
+					'X-SW-License-Key' => $license_key,
+					'X-SW-Domain'      => home_url(),
+				),
+				'timeout' => 5,
+			) );
+			if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+				$body = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( $body ) {
+					$synced_count  = (int) ( $body['synced_count'] ?? $body['embedding_count'] ?? 0 );
+					$catalog_count = (int) ( $body['catalog_count'] ?? 0 );
+				}
+			}
+		}
 		?>
 		<div class="sw-card">
 			<h2><?php esc_html_e( 'Sync Tool', 'shopwalk-ai' ); ?></h2>
@@ -155,23 +170,19 @@ final class Shopwalk_AI_Admin_Dashboard {
 			<div class="sw-stats">
 				<div class="sw-stat">
 					<div class="sw-stat-value"><?php echo esc_html( number_format( $product_count ) ); ?></div>
-					<div class="sw-stat-label"><?php esc_html_e( 'Total', 'shopwalk-ai' ); ?></div>
+					<div class="sw-stat-label"><?php esc_html_e( 'WooCommerce', 'shopwalk-ai' ); ?></div>
 				</div>
 				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( number_format( (int) $last_products ) ); ?></div>
+					<div class="sw-stat-value"><?php echo esc_html( number_format( $synced_count ) ); ?></div>
 					<div class="sw-stat-label"><?php esc_html_e( 'Synced', 'shopwalk-ai' ); ?></div>
 				</div>
 				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( $queue_count ); ?></div>
+					<div class="sw-stat-value"><?php echo esc_html( number_format( max( 0, $product_count - $synced_count ) ) ); ?></div>
 					<div class="sw-stat-label"><?php esc_html_e( 'Pending', 'shopwalk-ai' ); ?></div>
 				</div>
 			</div>
 
 			<table class="sw-details">
-				<tr><td><?php esc_html_e( 'Last sync', 'shopwalk-ai' ); ?></td><td><?php echo esc_html( $last_sync ); ?></td></tr>
-				<?php if ( $last_products > 0 ) : ?>
-					<tr><td><?php esc_html_e( 'Last result', 'shopwalk-ai' ); ?></td><td><?php echo esc_html( "$last_products products, $last_batches batches" ); ?></td></tr>
-				<?php endif; ?>
 				<tr><td><?php esc_html_e( 'Sync interval', 'shopwalk-ai' ); ?></td><td><?php echo esc_html( $interval ); ?></td></tr>
 			</table>
 
