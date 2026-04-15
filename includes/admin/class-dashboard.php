@@ -143,9 +143,11 @@ final class Shopwalk_AI_Admin_Dashboard {
 		$interval      = $tier === 'pro' ? '6 hours (Pro)' : '24 hours';
 
 		// Fetch sync counts from shopwalk-api (source of truth)
-		$synced_count = 0;
+		$synced_count  = 0;
 		$catalog_count = 0;
-		$license_key = get_option( 'shopwalk_license_key', '' );
+		$api_reachable = false;
+		$api_error     = '';
+		$license_key   = get_option( 'shopwalk_license_key', '' );
 		if ( $license_key ) {
 			$api_url  = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
 			$response = wp_remote_get( $api_url . '/api/v1/plugin/pro/status', array(
@@ -155,7 +157,12 @@ final class Shopwalk_AI_Admin_Dashboard {
 				),
 				'timeout' => 5,
 			) );
-			if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+			if ( is_wp_error( $response ) ) {
+				$api_error = $response->get_error_message();
+			} elseif ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+				$api_error = 'HTTP ' . wp_remote_retrieve_response_code( $response );
+			} else {
+				$api_reachable = true;
 				$body = json_decode( wp_remote_retrieve_body( $response ), true );
 				if ( $body ) {
 					$synced_count  = (int) ( $body['synced_count'] ?? $body['embedding_count'] ?? 0 );
@@ -167,17 +174,27 @@ final class Shopwalk_AI_Admin_Dashboard {
 		<div class="sw-card">
 			<h2><?php esc_html_e( 'Sync Tool', 'shopwalk-ai' ); ?></h2>
 
+			<?php if ( ! $api_reachable && $license_key ) : ?>
+				<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-bottom:12px;font-size:13px;">
+					<strong>Cannot reach Shopwalk API</strong>
+					<?php if ( $api_error ) : ?>
+						— <?php echo esc_html( $api_error ); ?>
+					<?php endif; ?>
+					<br>Sync counts may be stale. Check <a href="https://status.shopwalk.com" target="_blank">status.shopwalk.com</a> or try again later.
+				</div>
+			<?php endif; ?>
+
 			<div class="sw-stats">
 				<div class="sw-stat">
 					<div class="sw-stat-value"><?php echo esc_html( number_format( $product_count ) ); ?></div>
 					<div class="sw-stat-label"><?php esc_html_e( 'WooCommerce', 'shopwalk-ai' ); ?></div>
 				</div>
 				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( number_format( $synced_count ) ); ?></div>
+					<div class="sw-stat-value"><?php echo esc_html( $api_reachable ? number_format( $synced_count ) : '—' ); ?></div>
 					<div class="sw-stat-label"><?php esc_html_e( 'Synced', 'shopwalk-ai' ); ?></div>
 				</div>
 				<div class="sw-stat">
-					<div class="sw-stat-value"><?php echo esc_html( number_format( max( 0, $product_count - $synced_count ) ) ); ?></div>
+					<div class="sw-stat-value"><?php echo esc_html( $api_reachable ? number_format( max( 0, $product_count - $synced_count ) ) : '—' ); ?></div>
 					<div class="sw-stat-label"><?php esc_html_e( 'Pending', 'shopwalk-ai' ); ?></div>
 				</div>
 			</div>
@@ -373,7 +390,13 @@ final class Shopwalk_AI_Admin_Dashboard {
 				probeBtn.disabled = false;
 				probeBtn.textContent = 'Test Connectivity';
 				if (!resp || !resp.success) {
-					out.innerHTML = '<p style="color:#991b1b;">Probe failed: ' + esc(resp && resp.data && resp.data.message || 'unknown') + '</p>';
+					var errMsg = resp && resp.data && resp.data.message || 'unknown error';
+					var html = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;">';
+					html += '<strong>Cannot reach Shopwalk API</strong> — ' + esc(errMsg) + '<br><br>';
+					html += 'This means the Shopwalk platform is temporarily unavailable. Your store and products are not affected.<br>';
+					html += 'Check <a href="https://status.shopwalk.com" target="_blank">status.shopwalk.com</a> or try again in a few minutes.';
+					html += '</div>';
+					out.innerHTML = html;
 					return;
 				}
 				var d = resp.data;
@@ -430,6 +453,10 @@ final class Shopwalk_AI_Admin_Dashboard {
 				}
 
 				out.innerHTML = html;
+			}).catch(function () {
+				probeBtn.disabled = false;
+				probeBtn.textContent = 'Test Connectivity';
+				out.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Network error</strong> — could not connect. Check your internet connection and try again.</div>';
 			});
 		});
 	}
