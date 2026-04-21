@@ -37,6 +37,27 @@ define( 'SHOPWALK_API_BASE', 'https://api.shopwalk.com/api/v1' );
 define( 'SHOPWALK_PARTNERS_URL', 'https://shopwalk.com/partners' );
 define( 'SHOPWALK_SIGNUP_URL', 'https://shopwalk.com/partners/signup' );
 
+// ─── WooCommerce feature compatibility ──────────────────────────────────────
+//
+// Declared as early as possible so WooCommerce sees them before feature gates
+// run. Must be registered on `before_woocommerce_init` per WC guidelines.
+
+add_action(
+	'before_woocommerce_init',
+	static function () {
+		if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+			// HPOS (High-Performance Order Storage): this plugin reads/writes orders
+			// exclusively via the WC CRUD API (wc_get_order/$order->save()), never raw $wpdb.
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+
+			// Cart/Checkout Blocks: the plugin is server-side only (REST endpoints +
+			// a payment gateway). It does not render or modify cart/checkout UI, so
+			// it is compatible with the Blocks-based checkout out of the box.
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
+		}
+	}
+);
+
 // ─── Activation / Deactivation ──────────────────────────────────────────────
 
 register_activation_hook( __FILE__, array( 'Shopwalk_AI', 'activate' ) );

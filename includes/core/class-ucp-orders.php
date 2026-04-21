@@ -66,7 +66,7 @@ final class UCP_Orders {
 			return $ctx;
 		}
 		if ( ! function_exists( 'wc_get_orders' ) ) {
-			return new WP_Error( 'wc_unavailable', 'WooCommerce is not active', array( 'status' => 503 ) );
+			return UCP_Response::error( 'wc_unavailable', 'WooCommerce is not active', 'fatal', 503 );
 		}
 
 		$limit  = max( 1, min( 100, (int) $request->get_param( 'limit' ) ?: 25 ) );
@@ -86,11 +86,14 @@ final class UCP_Orders {
 			$out[] = self::format_order( $order );
 		}
 		return new WP_REST_Response(
-			array(
-				'object' => 'list',
-				'data'   => $out,
-				'page'   => $page,
-				'limit'  => $limit,
+			UCP_Response::ok(
+				array(
+					'object' => 'list',
+					'data'   => $out,
+					'page'   => $page,
+					'limit'  => $limit,
+				),
+				array( 'dev.ucp.shopping.order' )
 			),
 			200
 		);
@@ -110,7 +113,7 @@ final class UCP_Orders {
 		$id    = (int) $request->get_param( 'id' );
 		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $id ) : null;
 		if ( ! $order || (int) $order->get_customer_id() !== (int) $ctx['user_id'] ) {
-			return new WP_Error( 'not_found', 'Order not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Order not found', 'recoverable', 404 );
 		}
 		return new WP_REST_Response( self::format_order( $order ), 200 );
 	}
@@ -129,24 +132,19 @@ final class UCP_Orders {
 		$id    = (int) $request->get_param( 'id' );
 		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $id ) : null;
 		if ( ! $order || (int) $order->get_customer_id() !== (int) $ctx['user_id'] ) {
-			return new WP_Error( 'not_found', 'Order not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Order not found', 'recoverable', 404 );
 		}
 
-		$notes = function_exists( 'wc_get_order_notes' ) ? wc_get_order_notes( array( 'order_id' => $id ) ) : array();
-		$events = array();
-		foreach ( $notes as $note ) {
-			$events[] = array(
-				'id'         => (string) $note->id,
-				'type'       => 'note',
-				'message'    => (string) $note->content,
-				'created_at' => $note->date_created instanceof \WC_DateTime ? $note->date_created->format( 'c' ) : '',
-			);
-		}
+		$events = self::build_fulfillment_events( $order );
+
 		return new WP_REST_Response(
-			array(
-				'object'   => 'list',
-				'order_id' => $id,
-				'data'     => $events,
+			UCP_Response::ok(
+				array(
+					'object'   => 'list',
+					'order_id' => strval( $id ),
+					'data'     => $events,
+				),
+				array( 'dev.ucp.shopping.order' )
 			),
 			200
 		);
@@ -159,42 +157,176 @@ final class UCP_Orders {
 	 * @return array<string,mixed>
 	 */
 	private static function format_order( $order ): array {
+		// Build line items with quantity tracking.
 		$line_items = array();
-		foreach ( $order->get_items() as $item ) {
-			$line_items[] = array(
-				'product_id' => (int) $item->get_product_id(),
-				'name'       => (string) $item->get_name(),
-				'quantity'   => (int) $item->get_quantity(),
-				'subtotal'   => (float) $item->get_subtotal(),
-				'total'      => (float) $item->get_total(),
+		$wc_items   = array_values( $order->get_items() );
+		foreach ( $wc_items as $idx => $wc_item ) {
+			$fulfilled_qty = 0;
+			// Check if order is completed — all items are fulfilled.
+			if ( $order->get_status() === 'completed' ) {
+				$fulfilled_qty = $wc_item->get_quantity();
+			}
+			$line_items[] = UCP_Response::build_order_line_item( $wc_item, $idx, $fulfilled_qty );
+		}
+
+		// Build fulfillment expectations from WC shipping methods.
+		$expectations    = self::build_fulfillment_expectations( $order, $wc_items );
+		$events          = self::build_fulfillment_events( $order );
+		$adjustments     = self::build_adjustments( $order );
+
+		return UCP_Response::ok(
+			array(
+				'id'            => strval( $order->get_id() ),
+				'object'        => 'order',
+				'label'         => '#' . $order->get_order_number(),
+				'checkout_id'   => $order->get_meta( '_ucp_checkout_session_id' ) ?: null,
+				'permalink_url' => $order->get_view_order_url(),
+				'status'        => (string) $order->get_status(),
+				'currency'      => (string) $order->get_currency(),
+				'line_items'    => $line_items,
+				'buyer'         => array(
+					'email'      => (string) $order->get_billing_email(),
+					'first_name' => (string) $order->get_billing_first_name(),
+					'last_name'  => (string) $order->get_billing_last_name(),
+				),
+				'fulfillment'   => array(
+					'expectations' => $expectations,
+					'events'       => $events,
+				),
+				'adjustments'   => $adjustments,
+				'totals'        => UCP_Response::build_totals(
+					$order->get_subtotal(),
+					$order->get_shipping_total(),
+					$order->get_total_tax(),
+					$order->get_discount_total(),
+					$order->get_total()
+				),
+				'messages'      => array(),
+				'created_at'    => $order->get_date_created() ? $order->get_date_created()->format( 'c' ) : null,
+			),
+			array( 'dev.ucp.shopping.order' )
+		);
+	}
+
+	/**
+	 * Build fulfillment expectations from WC shipping methods.
+	 *
+	 * @param WC_Order $order    WooCommerce order.
+	 * @param array    $wc_items Array of WC_Order_Item_Product items.
+	 * @return array
+	 */
+	private static function build_fulfillment_expectations( $order, array $wc_items ): array {
+		$expectations    = array();
+		$shipping_methods = $order->get_shipping_methods();
+
+		if ( empty( $shipping_methods ) ) {
+			// No shipping methods — create a single expectation covering all items.
+			$expectations[] = array(
+				'id'             => 'exp_1',
+				'line_items'     => array_map( function ( $li, $idx ) {
+					return array( 'id' => 'li_' . ( $idx + 1 ), 'quantity' => $li->get_quantity() );
+				}, $wc_items, array_keys( $wc_items ) ),
+				'method_type'    => 'shipping',
+				'destination'    => UCP_Response::to_destination( array(
+					'address_1' => $order->get_shipping_address_1(),
+					'address_2' => $order->get_shipping_address_2(),
+					'city'      => $order->get_shipping_city(),
+					'state'     => $order->get_shipping_state(),
+					'postcode'  => $order->get_shipping_postcode(),
+					'country'   => $order->get_shipping_country(),
+				) ),
+				'description'    => 'Standard shipping',
+				'fulfillable_on' => 'now',
+			);
+			return $expectations;
+		}
+
+		foreach ( array_values( $shipping_methods ) as $i => $method ) {
+			$expectations[] = array(
+				'id'             => 'exp_' . ( $i + 1 ),
+				'line_items'     => array_map( function ( $li, $idx ) {
+					return array( 'id' => 'li_' . ( $idx + 1 ), 'quantity' => $li->get_quantity() );
+				}, $wc_items, array_keys( $wc_items ) ),
+				'method_type'    => 'shipping',
+				'destination'    => UCP_Response::to_destination( array(
+					'address_1' => $order->get_shipping_address_1(),
+					'address_2' => $order->get_shipping_address_2(),
+					'city'      => $order->get_shipping_city(),
+					'state'     => $order->get_shipping_state(),
+					'postcode'  => $order->get_shipping_postcode(),
+					'country'   => $order->get_shipping_country(),
+				) ),
+				'description'    => $method->get_method_title(),
+				'fulfillable_on' => 'now',
 			);
 		}
-		return array(
-			'id'         => (int) $order->get_id(),
-			'object'     => 'order',
-			'status'     => (string) $order->get_status(),
-			'currency'   => (string) $order->get_currency(),
-			'line_items' => $line_items,
-			'totals'     => array(
-				'subtotal' => (float) $order->get_subtotal(),
-				'shipping' => (float) $order->get_shipping_total(),
-				'tax'      => (float) $order->get_total_tax(),
-				'total'    => (float) $order->get_total(),
-			),
-			'buyer' => array(
-				'email'      => (string) $order->get_billing_email(),
-				'first_name' => (string) $order->get_billing_first_name(),
-				'last_name'  => (string) $order->get_billing_last_name(),
-			),
-			'shipping_address' => array(
-				'line1'       => (string) $order->get_shipping_address_1(),
-				'line2'       => (string) $order->get_shipping_address_2(),
-				'city'        => (string) $order->get_shipping_city(),
-				'state'       => (string) $order->get_shipping_state(),
-				'postal_code' => (string) $order->get_shipping_postcode(),
-				'country'     => (string) $order->get_shipping_country(),
-			),
-			'created_at' => $order->get_date_created() ? $order->get_date_created()->format( 'c' ) : null,
-		);
+
+		return $expectations;
+	}
+
+	/**
+	 * Build fulfillment events from WC order notes.
+	 *
+	 * @param WC_Order $order WooCommerce order.
+	 * @return array
+	 */
+	private static function build_fulfillment_events( $order ): array {
+		$events = array();
+		$notes  = function_exists( 'wc_get_order_notes' )
+			? wc_get_order_notes( array( 'order_id' => $order->get_id(), 'type' => 'any' ) )
+			: array();
+
+		$tracking = $order->get_meta( '_tracking_number' );
+
+		foreach ( $notes as $note ) {
+			$event = array(
+				'id'          => 'evt_' . $note->id,
+				'occurred_at' => $note->date_created instanceof \WC_DateTime
+					? $note->date_created->format( 'c' )
+					: ( is_object( $note->date_created ) && method_exists( $note->date_created, 'date' )
+						? $note->date_created->date( 'c' )
+						: '' ),
+				'type'        => 'processing',
+				'description' => (string) $note->content,
+			);
+
+			// Check for tracking info in note content.
+			if ( $tracking && stripos( $note->content, 'shipped' ) !== false ) {
+				$event['type']            = 'shipped';
+				$event['tracking_number'] = $tracking;
+				$event['tracking_url']    = $order->get_meta( '_tracking_url' ) ?: '';
+				$event['carrier']         = $order->get_meta( '_tracking_provider' ) ?: '';
+			}
+
+			$events[] = $event;
+		}
+
+		return $events;
+	}
+
+	/**
+	 * Build adjustments (refunds) from WC order refunds.
+	 *
+	 * @param WC_Order $order WooCommerce order.
+	 * @return array
+	 */
+	private static function build_adjustments( $order ): array {
+		$adjustments = array();
+		$refunds     = $order->get_refunds();
+
+		foreach ( $refunds as $refund ) {
+			$adjustments[] = array(
+				'id'          => 'adj_' . $refund->get_id(),
+				'type'        => 'refund',
+				'occurred_at' => $refund->get_date_created() ? $refund->get_date_created()->format( 'c' ) : '',
+				'status'      => 'completed',
+				'totals'      => array(
+					array( 'type' => 'total', 'amount' => UCP_Response::to_cents( $refund->get_amount() ) * -1 ),
+				),
+				'description' => $refund->get_reason() ?: 'Refund',
+			);
+		}
+
+		return $adjustments;
 	}
 }

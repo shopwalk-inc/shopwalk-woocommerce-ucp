@@ -1,9 +1,11 @@
 === Shopwalk AI — UCP Adapter for WooCommerce ===
 Contributors: shopwalkinc
-Tags: woocommerce, ai, ucp, agent, commerce, oauth
+Tags: woocommerce, ai, ucp, agent, commerce
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
+WC requires at least: 8.0
+WC tested up to: 9.5
 Stable tag: 3.0.41
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -72,6 +74,18 @@ Yes. The discovery doc is served via a static `.well-known/ucp.php` shim with an
 = What WooCommerce version is required? =
 
 WooCommerce 8.0 or later. WordPress 6.0 or later. PHP 8.0 or later.
+
+= Does the plugin have its own payment keys? =
+
+No. The plugin reuses whatever payment gateway you already have configured in WooCommerce — WC Stripe, WC PayPal, Square, Amazon Pay, anything on the WooCommerce marketplace. When a UCP agent completes a checkout session, the plugin dispatches the payment through an adapter that reads your existing gateway's credentials; you never enter payment keys in the plugin itself.
+
+= What happens during an AI agent purchase? =
+
+The agent creates a UCP checkout session, submits a tokenized payment credential, and calls `/complete`. The plugin routes that credential to your existing WooCommerce gateway (e.g. WC Stripe), authorizes the payment, and creates the WooCommerce order in the usual `processing` state — identical to a native checkout. If the agent can't auto-authorize (for example when 3D Secure is required), the session falls back to returning a `payment_url` the agent can hand to the buyer.
+
+= Which payment gateways are supported out of the box? =
+
+Stripe (via the WooCommerce Stripe Gateway plugin). Additional adapters for PayPal, Square, and others can be added via the `shopwalk_ucp_payment_adapters` filter without modifying plugin code. The WP Admin **Shopwalk AI → Payments** panel shows which adapters are registered, which are ready, and deep-links into WooCommerce for any that aren't configured yet.
 
 = How do I uninstall cleanly? =
 

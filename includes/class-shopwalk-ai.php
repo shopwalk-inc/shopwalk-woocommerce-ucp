@@ -80,12 +80,21 @@ final class Shopwalk_AI {
 		require_once $dir . 'class-ucp-storage.php';
 		require_once $dir . 'class-ucp-signing.php';
 
+		// UCP response envelope helper — loaded before commerce classes that depend on it.
+		require_once $dir . 'class-ucp-response.php';
+
+		// Payment router + shipped adapters — loaded before checkout so the
+		// /complete handler can dispatch to them.
+		require_once $dir . 'class-ucp-payment-router.php';
+		require_once $dir . 'class-ucp-payment-adapter-stripe.php';
+
 		// OAuth subsystem.
 		require_once $dir . 'class-ucp-oauth-clients.php';
 		require_once $dir . 'class-ucp-oauth-server.php';
 
 		// Commerce surface.
 		require_once $dir . 'class-ucp-checkout.php';
+		require_once $dir . 'class-ucp-direct-checkout.php';
 		require_once $dir . 'class-ucp-orders.php';
 
 		// Webhooks.

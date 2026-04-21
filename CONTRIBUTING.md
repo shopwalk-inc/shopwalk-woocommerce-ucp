@@ -1,6 +1,6 @@
-# Contributing to Shopwalk WooCommerce Plugin
+# Contributing to the WooCommerce UCP Plugin
 
-Thank you for your interest in contributing! This plugin implements the [Universal Checkout Protocol (UCP)](https://shopwalk.com/ucp) for WooCommerce.
+Thank you for your interest in contributing! This plugin implements the [Universal Commerce Protocol (UCP)](https://ucp.dev) for WooCommerce. Optional Shopwalk integration layers on top of the core UCP adapter.
 
 ## How to Contribute
 

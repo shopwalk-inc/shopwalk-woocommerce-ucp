@@ -100,10 +100,20 @@ final class UCP_Checkout {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function create_session( WP_REST_Request $request ) {
+		// Idempotency-Key support: return cached response if present.
+		$idempotency_key = $request->get_header( 'Idempotency-Key' );
+		if ( $idempotency_key ) {
+			$cache_key = 'ucp_idem_' . md5( $idempotency_key );
+			$cached    = get_transient( $cache_key );
+			if ( false !== $cached ) {
+				return new WP_REST_Response( $cached['body'], $cached['status'] );
+			}
+		}
+
 		$body       = $request->get_json_params() ?: array();
 		$line_items = $body['line_items'] ?? array();
 		if ( ! is_array( $line_items ) || count( $line_items ) === 0 ) {
-			return new WP_Error( 'invalid_request', 'line_items[] is required', array( 'status' => 400 ) );
+			return UCP_Response::error( 'invalid_request', 'line_items[] is required', 'recoverable', 400 );
 		}
 
 		$client_id = self::resolve_client_id( $request );
@@ -136,7 +146,14 @@ final class UCP_Checkout {
 			)
 		);
 
-		return new WP_REST_Response( self::session_to_object( $id ), 201 );
+		$response_body = self::session_to_object( $id );
+
+		// Cache for idempotency if key was provided.
+		if ( ! empty( $idempotency_key ) ) {
+			set_transient( $cache_key, array( 'body' => $response_body, 'status' => 201 ), DAY_IN_SECONDS );
+		}
+
+		return new WP_REST_Response( $response_body, 201 );
 	}
 
 	// ── READ ─────────────────────────────────────────────────────────────
@@ -151,7 +168,7 @@ final class UCP_Checkout {
 		$id  = (string) $request->get_param( 'id' );
 		$obj = self::session_to_object( $id );
 		if ( ! $obj ) {
-			return new WP_Error( 'not_found', 'Session not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Session not found', 'recoverable', 404 );
 		}
 		return new WP_REST_Response( $obj, 200 );
 	}
@@ -168,10 +185,10 @@ final class UCP_Checkout {
 		$id  = (string) $request->get_param( 'id' );
 		$row = self::find( $id );
 		if ( ! $row ) {
-			return new WP_Error( 'not_found', 'Session not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Session not found', 'recoverable', 404 );
 		}
 		if ( $row['status'] !== 'incomplete' && $row['status'] !== 'ready_for_complete' ) {
-			return new WP_Error( 'invalid_state', 'Session cannot be updated in its current status', array( 'status' => 409 ) );
+			return UCP_Response::error( 'invalid_state', 'Session cannot be updated in its current status', 'recoverable', 409 );
 		}
 
 		$body    = $request->get_json_params() ?: array();
@@ -216,10 +233,10 @@ final class UCP_Checkout {
 		$id  = (string) $request->get_param( 'id' );
 		$row = self::find( $id );
 		if ( ! $row ) {
-			return new WP_Error( 'not_found', 'Session not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Session not found', 'recoverable', 404 );
 		}
 		if ( $row['status'] !== 'ready_for_complete' ) {
-			return new WP_Error( 'invalid_state', 'Session is not ready_for_complete', array( 'status' => 409 ) );
+			return UCP_Response::error( 'invalid_state', 'Session is not ready_for_complete', 'recoverable', 409 );
 		}
 
 		// Create the WC order.
@@ -262,10 +279,10 @@ final class UCP_Checkout {
 		$id  = (string) $request->get_param( 'id' );
 		$row = self::find( $id );
 		if ( ! $row ) {
-			return new WP_Error( 'not_found', 'Session not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Session not found', 'recoverable', 404 );
 		}
 		if ( $row['status'] === 'completed' ) {
-			return new WP_Error( 'invalid_state', 'Cannot cancel a completed session', array( 'status' => 409 ) );
+			return UCP_Response::error( 'invalid_state', 'Cannot cancel a completed session', 'recoverable', 409 );
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -330,22 +347,111 @@ final class UCP_Checkout {
 		if ( ! $row ) {
 			return null;
 		}
-		return array(
+
+		$raw_line_items = json_decode( (string) $row['line_items'], true ) ?: array();
+		$raw_totals     = json_decode( (string) $row['totals'], true ) ?: array();
+		$fulfillment_in = $row['fulfillment'] ? json_decode( (string) $row['fulfillment'], true ) : null;
+		$wc_order_id    = $row['wc_order_id'] ? (int) $row['wc_order_id'] : null;
+
+		// Build line items — if WC order exists, use WC items for full data.
+		$line_items    = array();
+		$line_item_ids = array();
+		if ( $wc_order_id && function_exists( 'wc_get_order' ) ) {
+			$order = wc_get_order( $wc_order_id );
+			if ( $order ) {
+				foreach ( array_values( $order->get_items() ) as $idx => $wc_item ) {
+					$li = UCP_Response::build_line_item( $wc_item, $idx );
+					$line_items[]    = $li;
+					$line_item_ids[] = $li['id'];
+				}
+			}
+		}
+		if ( empty( $line_items ) ) {
+			// Fallback: build from raw stored data.
+			foreach ( $raw_line_items as $idx => $item ) {
+				$li_id           = 'li_' . ( $idx + 1 );
+				$line_items[]    = array(
+					'id'       => $li_id,
+					'item'     => array(
+						'id'    => strval( $item['product_id'] ?? '' ),
+						'title' => $item['name'] ?? '',
+						'price' => UCP_Response::to_cents( $item['price'] ?? 0 ),
+					),
+					'quantity' => $item['quantity'] ?? 0,
+				);
+				$line_item_ids[] = $li_id;
+			}
+		}
+
+		// Build typed totals.
+		if ( $wc_order_id && function_exists( 'wc_get_order' ) ) {
+			$order = $order ?? wc_get_order( $wc_order_id );
+			if ( $order ) {
+				$totals   = UCP_Response::build_totals(
+					$order->get_subtotal(),
+					$order->get_shipping_total(),
+					$order->get_total_tax(),
+					$order->get_discount_total(),
+					$order->get_total()
+				);
+				$currency = $order->get_currency();
+			} else {
+				$totals   = UCP_Response::build_totals( $raw_totals['subtotal'] ?? 0, 0, 0, 0, $raw_totals['subtotal'] ?? 0 );
+				$currency = $raw_totals['currency'] ?? 'USD';
+			}
+		} else {
+			$totals   = UCP_Response::build_totals( $raw_totals['subtotal'] ?? 0, 0, 0, 0, $raw_totals['subtotal'] ?? 0 );
+			$currency = $raw_totals['currency'] ?? 'USD';
+		}
+
+		// Build fulfillment model.
+		$fulfillment = null;
+		if ( $fulfillment_in ) {
+			$address_data = $fulfillment_in['shipping_address'] ?? $fulfillment_in;
+			$fulfillment  = array(
+				'methods' => array(
+					array(
+						'id'                       => 'fm_1',
+						'type'                     => 'shipping',
+						'line_item_ids'            => $line_item_ids,
+						'selected_destination_id'  => 'dest_1',
+						'destinations'             => array( UCP_Response::to_destination( $address_data ) ),
+						'groups'                   => array(),
+					),
+				),
+			);
+		}
+
+		$data = array(
 			'id'          => (string) $row['id'],
 			'object'      => 'checkout_session',
 			'client_id'   => (string) $row['client_id'],
 			'status'      => (string) $row['status'],
-			'line_items'  => json_decode( (string) $row['line_items'], true ),
+			'line_items'  => $line_items,
 			'buyer'       => $row['buyer'] ? json_decode( (string) $row['buyer'], true ) : null,
-			'fulfillment' => $row['fulfillment'] ? json_decode( (string) $row['fulfillment'], true ) : null,
+			'fulfillment' => $fulfillment,
 			'payment'     => $row['payment'] ? json_decode( (string) $row['payment'], true ) : null,
-			'totals'      => json_decode( (string) $row['totals'], true ),
-			'messages'    => json_decode( (string) $row['messages'], true ),
-			'wc_order_id' => $row['wc_order_id'] ? (int) $row['wc_order_id'] : null,
+			'totals'      => $totals,
+			'currency'    => $currency,
+			'messages'    => json_decode( (string) $row['messages'], true ) ?: array(),
 			'created_at'  => (string) $row['created_at'],
 			'updated_at'  => (string) $row['updated_at'],
 			'expires_at'  => (string) $row['expires_at'],
 		);
+
+		// On completed sessions, include order reference + payment URL so the
+		// agent can hand control to the buyer for native-checkout payment.
+		if ( $row['status'] === 'completed' && $wc_order_id ) {
+			$order        = $order ?? ( function_exists( 'wc_get_order' ) ? wc_get_order( $wc_order_id ) : null );
+			$data['order'] = array(
+				'id'            => strval( $wc_order_id ),
+				'permalink_url' => $order ? $order->get_view_order_url() : '',
+				'payment_url'   => $order ? $order->get_checkout_payment_url() : '',
+				'status'        => $order ? $order->get_status() : '',
+			);
+		}
+
+		return UCP_Response::ok( $data, array( 'dev.ucp.shopping.checkout' ) );
 	}
 
 	/**
@@ -358,7 +464,7 @@ final class UCP_Checkout {
 	private static function calculate_totals( array $line_items ): array {
 		$subtotal = 0.0;
 		foreach ( $line_items as $item ) {
-			$pid = (int) ( $item['product_id'] ?? 0 );
+			$pid = (int) ( $item['product_id'] ?? $item['item']['id'] ?? 0 );
 			$qty = (int) ( $item['quantity'] ?? 0 );
 			if ( $pid <= 0 || $qty <= 0 ) {
 				continue;
@@ -383,7 +489,7 @@ final class UCP_Checkout {
 	 */
 	private static function build_wc_order_from_session( array $row ) {
 		if ( ! function_exists( 'wc_create_order' ) ) {
-			return new WP_Error( 'wc_unavailable', 'WooCommerce is not active', array( 'status' => 503 ) );
+			return UCP_Response::error( 'wc_unavailable', 'WooCommerce is not active', 'fatal', 503 );
 		}
 		$order = wc_create_order(
 			array(
@@ -415,105 +521,76 @@ final class UCP_Checkout {
 		}
 
 		$fulfillment = json_decode( (string) $row['fulfillment'], true );
-		if ( is_array( $fulfillment ) && isset( $fulfillment['shipping_address'] ) ) {
-			$ship = $fulfillment['shipping_address'];
-			$order->set_shipping_address_1( (string) ( $ship['line1'] ?? '' ) );
-			$order->set_shipping_address_2( (string) ( $ship['line2'] ?? '' ) );
-			$order->set_shipping_city( (string) ( $ship['city'] ?? '' ) );
-			$order->set_shipping_state( (string) ( $ship['state'] ?? '' ) );
-			$order->set_shipping_postcode( (string) ( $ship['postal_code'] ?? '' ) );
-			$order->set_shipping_country( (string) ( $ship['country'] ?? '' ) );
+		if ( is_array( $fulfillment ) ) {
+			$ship = null;
+			// Support new UCP fulfillment model (methods[].destinations[]).
+			if ( isset( $fulfillment['methods'][0]['destinations'][0] ) ) {
+				$dest = $fulfillment['methods'][0]['destinations'][0];
+				$ship = array(
+					'line1'       => $dest['street_address'] ?? '',
+					'line2'       => '',
+					'city'        => $dest['address_locality'] ?? '',
+					'state'       => $dest['address_region'] ?? '',
+					'postal_code' => $dest['postal_code'] ?? '',
+					'country'     => $dest['address_country'] ?? '',
+				);
+			} elseif ( isset( $fulfillment['shipping_address'] ) ) {
+				// Legacy flat shipping_address format.
+				$ship = $fulfillment['shipping_address'];
+			}
+
+			if ( $ship ) {
+				$order->set_shipping_address_1( (string) ( $ship['line1'] ?? $ship['address_1'] ?? '' ) );
+				$order->set_shipping_address_2( (string) ( $ship['line2'] ?? $ship['address_2'] ?? '' ) );
+				$order->set_shipping_city( (string) ( $ship['city'] ?? '' ) );
+				$order->set_shipping_state( (string) ( $ship['state'] ?? '' ) );
+				$order->set_shipping_postcode( (string) ( $ship['postal_code'] ?? $ship['postcode'] ?? '' ) );
+				$order->set_shipping_country( (string) ( $ship['country'] ?? '' ) );
+			}
 		}
 
 		$order->set_payment_method( 'shopwalk_ucp' );
 		$order->set_payment_method_title( 'Pay via UCP' );
 		$order->update_meta_data( '_ucp_session_id', (string) $row['id'] );
+		$order->update_meta_data( '_ucp_checkout_session_id', (string) $row['id'] );
 		$order->update_meta_data( '_ucp_client_id', (string) $row['client_id'] );
 		$order->calculate_totals();
 
-		// Process payment if Stripe PaymentMethod ID is provided
+		// Dispatch agent-native payment through the router. The router picks
+		// the adapter matching `payment.gateway` and the adapter reuses the
+		// merchant's already-configured WooCommerce gateway credentials —
+		// the plugin itself owns no payment keys.
+		//
+		// If payment is omitted or the selected gateway can't auto-authorize
+		// (e.g. Stripe requires 3DS), the order stays in `pending` and the
+		// session's `order.payment_url` is returned so the agent can hand
+		// the buyer off to native checkout.
 		$payment = json_decode( (string) $row['payment'], true );
-		$stripe_pm_id = $payment['stripe_payment_method_id'] ?? '';
+		$payment = is_array( $payment ) ? $payment : array();
 
-		if ( $stripe_pm_id !== '' ) {
-			$stripe_result = self::process_stripe_payment( $order, $stripe_pm_id, $payment );
-			if ( is_wp_error( $stripe_result ) ) {
-				$order->update_status( 'failed', 'Stripe payment failed: ' . $stripe_result->get_error_message() );
-				return $stripe_result;
+		if ( ! empty( $payment['gateway'] ) ) {
+			$result = UCP_Payment_Router::authorize( $order, $payment );
+
+			if ( is_wp_error( $result ) ) {
+				$code = $result->get_error_code();
+				// `stripe_requires_action` and similar soft failures are
+				// recoverable via the payment_url handoff — keep the order
+				// in pending so the buyer can complete 3DS on native checkout.
+				if ( $code === 'stripe_requires_action' ) {
+					$order->update_status( 'pending', 'UCP payment deferred to buyer (3DS required): ' . $result->get_error_message() );
+					return $order;
+				}
+				$order->update_status( 'failed', sprintf( 'UCP payment (%s) failed: %s', $code, $result->get_error_message() ) );
+				return $result;
 			}
-			$order->update_meta_data( '_stripe_payment_intent_id', $stripe_result['payment_intent_id'] );
-			$order->update_meta_data( '_stripe_charge_captured', 'no' ); // Manual capture
-			$order->payment_complete( $stripe_result['payment_intent_id'] );
-			$order->add_order_note( 'Payment authorized via Stripe (manual capture). PI: ' . $stripe_result['payment_intent_id'] );
-		} else {
-			$order->update_status( 'processing', 'UCP checkout completed by agent.' );
+			// Adapter already advanced the order state via payment_complete().
+			return $order;
 		}
 
+		// No payment credential supplied — fall back to the payment_url
+		// handoff. The agent can still hand the buyer to native checkout.
+		$order->update_status( 'pending', 'UCP session completed; awaiting buyer payment.' );
 		return $order;
-	}
-
-	/**
-	 * Process a Stripe payment using a PaymentMethod ID.
-	 * Creates a PaymentIntent with manual capture (authorize only).
-	 * The store captures after fulfillment.
-	 *
-	 * @param WC_Order $order        The WooCommerce order.
-	 * @param string   $pm_id        Stripe PaymentMethod ID (pm_...).
-	 * @param array    $payment_data Full payment object from the session.
-	 * @return array{payment_intent_id:string}|WP_Error
-	 */
-	private static function process_stripe_payment( $order, string $pm_id, array $payment_data ) {
-		$secret_key = get_option( 'shopwalk_stripe_secret_key', '' );
-		if ( $secret_key === '' ) {
-			return new WP_Error( 'stripe_not_configured', 'Stripe secret key not configured', array( 'status' => 503 ) );
-		}
-
-		$amount   = (int) round( $order->get_total() * 100 ); // cents
-		$currency = strtolower( $order->get_currency() );
-
-		$body = array(
-			'amount'               => $amount,
-			'currency'             => $currency,
-			'payment_method'       => $pm_id,
-			'capture_method'       => 'manual', // Authorize only — capture after fulfillment
-			'confirm'              => 'true',
-			'description'          => 'Order #' . $order->get_id() . ' via Shopwalk UCP',
-			'metadata[order_id]'   => (string) $order->get_id(),
-			'metadata[source]'     => 'shopwalk_ucp',
-		);
-
-		// Attach customer if provided
-		$stripe_customer = $payment_data['stripe_customer_id'] ?? '';
-		if ( $stripe_customer !== '' ) {
-			$body['customer'] = $stripe_customer;
-		}
-
-		$response = wp_remote_post( 'https://api.stripe.com/v1/payment_intents', array(
-			'headers' => array(
-				'Authorization' => 'Bearer ' . $secret_key,
-				'Content-Type'  => 'application/x-www-form-urlencoded',
-			),
-			'body'    => $body,
-			'timeout' => 30,
-		) );
-
-		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'stripe_error', 'Stripe API unreachable: ' . $response->get_error_message(), array( 'status' => 502 ) );
-		}
-
-		$status = wp_remote_retrieve_response_code( $response );
-		$result = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( $status >= 400 || ! is_array( $result ) || empty( $result['id'] ) ) {
-			$error_msg = $result['error']['message'] ?? 'Unknown Stripe error';
-			return new WP_Error( 'stripe_declined', $error_msg, array( 'status' => 402 ) );
-		}
-
-		if ( $result['status'] !== 'requires_capture' && $result['status'] !== 'succeeded' ) {
-			return new WP_Error( 'stripe_requires_action', 'Payment requires additional action (3D Secure)', array( 'status' => 402 ) );
-		}
-
-		return array( 'payment_intent_id' => $result['id'] );
 	}
 
 	/**

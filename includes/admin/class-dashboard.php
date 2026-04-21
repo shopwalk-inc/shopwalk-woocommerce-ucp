@@ -30,6 +30,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 		add_action( 'wp_ajax_shopwalk_test_license', array( $this, 'ajax_test_license' ) );
 		add_action( 'wp_ajax_shopwalk_disconnect', array( $this, 'ajax_disconnect' ) );
 		add_action( 'wp_ajax_shopwalk_sync_status', array( $this, 'ajax_sync_status' ) );
+		add_action( 'wp_ajax_shopwalk_payments_status', array( $this, 'ajax_payments_status' ) );
 	}
 
 	public function register_menu(): void {
@@ -55,12 +56,13 @@ final class Shopwalk_AI_Admin_Dashboard {
 			'window.swAdmin = ' . wp_json_encode( array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonces'  => array(
-					'self_test'    => wp_create_nonce( 'shopwalk_self_test' ),
-					'probe'        => wp_create_nonce( 'shopwalk_probe' ),
-					'activate'     => wp_create_nonce( 'shopwalk_activate' ),
-					'test_license' => wp_create_nonce( 'shopwalk_test_license' ),
-					'disconnect'   => wp_create_nonce( 'shopwalk_disconnect' ),
-					'sync_status'  => wp_create_nonce( 'shopwalk_sync_status' ),
+					'self_test'       => wp_create_nonce( 'shopwalk_self_test' ),
+					'probe'           => wp_create_nonce( 'shopwalk_probe' ),
+					'activate'        => wp_create_nonce( 'shopwalk_activate' ),
+					'test_license'    => wp_create_nonce( 'shopwalk_test_license' ),
+					'disconnect'      => wp_create_nonce( 'shopwalk_disconnect' ),
+					'sync_status'     => wp_create_nonce( 'shopwalk_sync_status' ),
+					'payments_status' => wp_create_nonce( 'shopwalk_payments_status' ),
 				),
 			) ) . ';' . $this->admin_js()
 		);
@@ -102,6 +104,7 @@ final class Shopwalk_AI_Admin_Dashboard {
 			<?php $this->render_styles(); ?>
 			<div id="sw-status-banner"></div>
 			<?php $this->render_ucp_tool( $tier ); ?>
+			<?php $this->render_payments_tool(); ?>
 			<?php if ( $tier !== 'unlicensed' ) : ?>
 				<?php $this->render_sync_tool( $tier ); ?>
 			<?php endif; ?>
@@ -133,6 +136,27 @@ final class Shopwalk_AI_Admin_Dashboard {
 				<button type="button" class="button" id="sw-self-test-btn">
 					<?php esc_html_e( 'Local Self-Test', 'shopwalk-ai' ); ?>
 				</button>
+			</p>
+		</div>
+		<?php
+	}
+
+	// ── Payments ───────────────────────────────────────────────────────────
+
+	private function render_payments_tool(): void {
+		?>
+		<div class="sw-card">
+			<h2><?php esc_html_e( 'Payments', 'shopwalk-ai' ); ?></h2>
+			<p class="sw-muted">
+				<?php esc_html_e( 'UCP agents complete payment using whichever WooCommerce gateways you already have configured. The plugin never asks for its own payment keys.', 'shopwalk-ai' ); ?>
+			</p>
+			<div id="sw-payments-list" class="sw-muted">
+				<?php esc_html_e( 'Loading payment gateways…', 'shopwalk-ai' ); ?>
+			</div>
+			<p>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout' ) ); ?>" class="button">
+					<?php esc_html_e( 'Open WooCommerce → Payments', 'shopwalk-ai' ); ?>
+				</a>
 			</p>
 		</div>
 		<?php
@@ -551,6 +575,41 @@ final class Shopwalk_AI_Admin_Dashboard {
 
 	loadSyncStatus();
 
+	// ── Payments (registered UCP adapters + readiness) ──────────────────
+	var paymentsEl = $('sw-payments-list');
+	if (paymentsEl) {
+		postAjax('shopwalk_payments_status', { nonce: s.nonces.payments_status }).then(function (resp) {
+			if (!resp || !resp.success) {
+				paymentsEl.innerHTML = '<p class="sw-muted">Could not load payment gateways.</p>';
+				return;
+			}
+			var gateways = (resp.data && resp.data.gateways) || [];
+			if (!gateways.length) {
+				paymentsEl.innerHTML = '<p class="sw-muted">No UCP payment adapters registered.</p>';
+				return;
+			}
+			var html = '';
+			gateways.forEach(function (g) {
+				var icon = g.ready ? '✅' : '⬜';
+				var state = g.ready ? 'Ready' + (g.mode ? ' · ' + esc(g.mode) : '') : 'Not configured';
+				html += '<div class="sw-check-row">';
+				html += '<span>' + icon + ' ' + esc(g.label) + ' <span class="sw-muted">' + esc(state) + '</span></span>';
+				html += '<span>';
+				if (g.ready) {
+					html += '<a href="' + esc(g.settings_url) + '">Manage →</a>';
+				} else if (g.install_url) {
+					html += '<a href="' + esc(g.settings_url) + '">Add keys</a> · ';
+					html += '<a href="' + esc(g.install_url) + '">' + esc(g.install_label) + '</a>';
+				} else {
+					html += '<a href="' + esc(g.settings_url) + '">Configure →</a>';
+				}
+				html += '</span>';
+				html += '</div>';
+			});
+			paymentsEl.innerHTML = html;
+		});
+	}
+
 	// ── Status Banner (from Shopwalk API) ───────────────────────────────
 	var bannerEl = $('sw-status-banner');
 	if (bannerEl) {
@@ -576,6 +635,9 @@ JS;
 
 	public function ajax_self_test(): void {
 		check_ajax_referer( 'shopwalk_self_test', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
 		$checks = array();
 
 		// 1. WooCommerce active
@@ -745,8 +807,97 @@ JS;
 		return array( 'name' => '', 'phone' => '', 'support' => '' );
 	}
 
+	public function ajax_payments_status(): void {
+		check_ajax_referer( 'shopwalk_payments_status', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
+
+		$adapters = class_exists( 'UCP_Payment_Router' ) ? UCP_Payment_Router::registry() : array();
+		$out      = array();
+
+		foreach ( $adapters as $gateway_id => $class ) {
+			$adapter = new $class();
+			$ready   = $adapter instanceof UCP_Payment_Adapter_Interface ? $adapter->is_ready() : false;
+			$hint    = $ready ? $adapter->discovery_hint() : array();
+
+			$out[] = array(
+				'id'            => (string) $gateway_id,
+				'label'         => $this->gateway_label( $gateway_id ),
+				'ready'         => $ready,
+				'mode'          => (string) ( $hint['mode'] ?? '' ),
+				'settings_url'  => $this->gateway_settings_url( $gateway_id ),
+				'install_url'   => $ready ? '' : $this->gateway_install_url( $gateway_id ),
+				'install_label' => $ready ? '' : $this->gateway_install_label( $gateway_id ),
+			);
+		}
+
+		wp_send_json_success( array( 'gateways' => $out ) );
+	}
+
+	/**
+	 * Friendly display name for a gateway id. Third-party adapters can
+	 * override via the shopwalk_ucp_payment_gateway_labels filter.
+	 */
+	private function gateway_label( string $id ): string {
+		$labels = apply_filters(
+			'shopwalk_ucp_payment_gateway_labels',
+			array(
+				'stripe'      => 'Stripe',
+				'ppcp'        => 'PayPal',
+				'square'      => 'Square',
+				'authnet'     => 'Authorize.net',
+				'amazon_pay'  => 'Amazon Pay',
+				'woopayments' => 'WooPayments',
+			)
+		);
+		return (string) ( $labels[ $id ] ?? ucfirst( str_replace( '_', ' ', $id ) ) );
+	}
+
+	/**
+	 * Deep link to the WC settings page for a given gateway. Filterable so
+	 * third-party adapters can point at their own settings page.
+	 */
+	private function gateway_settings_url( string $id ): string {
+		$map = apply_filters(
+			'shopwalk_ucp_payment_gateway_settings_urls',
+			array(
+				'stripe'      => admin_url( 'admin.php?page=wc-settings&tab=checkout&section=stripe' ),
+				'ppcp'        => admin_url( 'admin.php?page=wc-settings&tab=checkout&section=ppcp-gateway' ),
+				'square'      => admin_url( 'admin.php?page=wc-settings&tab=checkout&section=square_credit_card' ),
+				'woopayments' => admin_url( 'admin.php?page=wc-admin&path=/payments/overview' ),
+			)
+		);
+		return (string) ( $map[ $id ] ?? admin_url( 'admin.php?page=wc-settings&tab=checkout' ) );
+	}
+
+	/**
+	 * URL to install the underlying WC gateway plugin when the adapter
+	 * reports not-ready. Filterable.
+	 */
+	private function gateway_install_url( string $id ): string {
+		$map = apply_filters(
+			'shopwalk_ucp_payment_gateway_install_urls',
+			array(
+				'stripe'      => admin_url( 'plugin-install.php?s=woocommerce+stripe&tab=search&type=term' ),
+				'ppcp'        => admin_url( 'plugin-install.php?s=woocommerce+paypal+payments&tab=search&type=term' ),
+				'square'      => admin_url( 'plugin-install.php?s=woocommerce+square&tab=search&type=term' ),
+				'woopayments' => admin_url( 'plugin-install.php?s=woopayments&tab=search&type=term' ),
+			)
+		);
+		return (string) ( $map[ $id ] ?? '' );
+	}
+
+	private function gateway_install_label( string $id ): string {
+		$label = $this->gateway_label( $id );
+		return sprintf( 'Install WooCommerce %s →', $label );
+	}
+
 	public function ajax_sync_status(): void {
 		check_ajax_referer( 'shopwalk_sync_status', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
 
 		$license_key = get_option( 'shopwalk_license_key', '' );
 		if ( ! $license_key ) {
@@ -781,6 +932,9 @@ JS;
 
 	public function ajax_probe(): void {
 		check_ajax_referer( 'shopwalk_probe', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
 
 		$resp = wp_remote_post(
 			'https://api.shopwalk.com/api/v1/public/ucp/probe',
@@ -834,6 +988,9 @@ JS;
 
 	public function ajax_test_license(): void {
 		check_ajax_referer( 'shopwalk_test_license', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+		}
 
 		if ( ! class_exists( 'Shopwalk_License' ) ) {
 			wp_send_json_error( array( 'message' => 'License module not loaded.' ) );

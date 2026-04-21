@@ -50,52 +50,62 @@ final class UCP_Discovery {
 	 * @return WP_REST_Response
 	 */
 	public static function ucp_profile(): WP_REST_Response {
-		$base = get_rest_url( null, UCP_REST_NAMESPACE );
+		$base    = get_rest_url( null, UCP_REST_NAMESPACE );
+		$version = UCP_Response::VERSION;
+
+		$services = array(
+			'dev.ucp.shopping.checkout' => array(
+				'version'   => $version,
+				'spec'      => 'https://ucp.dev/latest/specification/checkout-rest/',
+				'transport' => 'rest',
+				'endpoint'  => $base,
+			),
+			'dev.ucp.shopping.order' => array(
+				'version'   => $version,
+				'spec'      => 'https://ucp.dev/latest/specification/order/',
+				'transport' => 'rest',
+				'endpoint'  => $base,
+			),
+			'dev.ucp.shopping.catalog' => array(
+				'version'   => $version,
+				'spec'      => 'https://ucp.dev/latest/specification/catalog/',
+				'transport' => 'rest',
+				'endpoint'  => $base,
+			),
+			'dev.ucp.common.identity_linking' => array(
+				'version'   => $version,
+				'spec'      => 'https://ucp.dev/latest/specification/identity-linking/',
+				'transport' => 'rest',
+				'endpoint'  => $base,
+			),
+		);
+
+		// Capabilities mirror services but without transport/endpoint.
+		$capabilities = array();
+		foreach ( $services as $key => $svc ) {
+			$capabilities[ $key ] = array(
+				'version' => $svc['version'],
+				'spec'    => $svc['spec'],
+			);
+		}
+
+		$payment_handlers = class_exists( 'UCP_Payment_Router' )
+			? UCP_Payment_Router::discovery_hints()
+			: array();
+
 		return new WP_REST_Response(
 			array(
-				'ucp_version' => '1.0',
-				'platform'    => 'woocommerce',
-				'plugin'      => array(
+				'ucp' => array(
+					'version'          => $version,
+					'services'         => $services,
+					'capabilities'     => $capabilities,
+					'payment_handlers' => empty( $payment_handlers ) ? (object) array() : $payment_handlers,
+					'signing_keys'     => array(),
+				),
+				'platform' => 'woocommerce',
+				'plugin'   => array(
 					'name'    => 'Shopwalk AI — UCP Adapter',
 					'version' => SHOPWALK_AI_VERSION,
-					'source'  => 'https://github.com/shopwalk-inc/woocommerce-ucp',
-				),
-				'store'       => array(
-					'name'        => (string) get_bloginfo( 'name' ),
-					'url'         => (string) home_url(),
-					'description' => (string) get_bloginfo( 'description' ),
-					'currency'    => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD',
-				),
-				'capabilities' => array(
-					'oauth2'           => true,
-					'checkout_sessions' => true,
-					'orders'           => true,
-					'webhooks'         => true,
-					'request_signing'  => true,
-				),
-				'endpoints' => array(
-					'oauth' => array(
-						'authorization_endpoint' => $base . '/oauth/authorize',
-						'token_endpoint'         => $base . '/oauth/token',
-						'revocation_endpoint'    => $base . '/oauth/revoke',
-						'userinfo_endpoint'      => $base . '/oauth/userinfo',
-					),
-					'checkout' => array(
-						'create'   => $base . '/checkout-sessions',
-						'retrieve' => $base . '/checkout-sessions/{id}',
-						'update'   => $base . '/checkout-sessions/{id}',
-						'complete' => $base . '/checkout-sessions/{id}/complete',
-						'cancel'   => $base . '/checkout-sessions/{id}/cancel',
-					),
-					'orders' => array(
-						'list'     => $base . '/orders',
-						'retrieve' => $base . '/orders/{id}',
-						'events'   => $base . '/orders/{id}/events',
-					),
-					'webhooks' => array(
-						'subscribe'    => $base . '/webhooks/subscriptions',
-						'subscription' => $base . '/webhooks/subscriptions/{id}',
-					),
 				),
 			),
 			200

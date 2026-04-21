@@ -2,16 +2,17 @@
 /**
  * UCP Payment Gateway — registers "Pay via UCP" with WooCommerce.
  *
- * The actual payment processing happens inside the UCP_Checkout::complete_session
- * handler — it extracts the payment credential from the request body and
- * routes it to the appropriate payment processor (Stripe PaymentMethod ID,
- * etc.). This gateway exists so that the WC order has a recognizable payment
- * method assigned, which keeps WC reports, refunds, and admin UI working
- * correctly.
+ * Orders created by UCP_Checkout::complete_session are labeled with this
+ * gateway so WC reports, refunds, and the admin Orders table recognize the
+ * order source. The plugin itself does NOT process payment — payment is
+ * completed by the buyer on the store's native checkout page using whatever
+ * WooCommerce payment gateway the merchant has configured (WC Stripe, WC
+ * PayPal, Square, Authorize.net, Amazon Pay, …). The session object's
+ * `order.payment_url` hands off that completion step.
  *
  * The gateway is hidden from the storefront — `is_available` returns false
- * because UCP checkouts go through the `/wp-json/ucp/v1/checkout-sessions`
- * flow, never the WC native checkout page.
+ * because UCP-initiated orders arrive pre-built via the REST API and don't
+ * use the WC checkout form's payment method selector.
  *
  * The actual gateway class extends WC_Payment_Gateway, which doesn't exist
  * until WooCommerce has loaded. So we declare it inside a `woocommerce_init`

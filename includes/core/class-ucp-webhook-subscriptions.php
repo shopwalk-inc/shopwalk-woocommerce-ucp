@@ -83,11 +83,11 @@ final class UCP_Webhook_Subscriptions {
 		$event_types  = (array) ( $body['event_types'] ?? array() );
 
 		if ( $callback_url === '' || ! filter_var( $callback_url, FILTER_VALIDATE_URL ) ) {
-			return new WP_Error( 'invalid_request', 'callback_url is required and must be a valid URL', array( 'status' => 400 ) );
+			return UCP_Response::error( 'invalid_request', 'callback_url is required and must be a valid URL', 'recoverable', 400 );
 		}
 		$event_types = array_values( array_intersect( $event_types, self::ALLOWED_EVENTS ) );
 		if ( count( $event_types ) === 0 ) {
-			return new WP_Error( 'invalid_request', 'At least one event_type from ' . implode( ',', self::ALLOWED_EVENTS ) . ' is required', array( 'status' => 400 ) );
+			return UCP_Response::error( 'invalid_request', 'At least one event_type from ' . implode( ',', self::ALLOWED_EVENTS ) . ' is required', 'recoverable', 400 );
 		}
 
 		$id     = UCP_OAuth_Clients::generate_id( 'wh_' );
@@ -109,13 +109,15 @@ final class UCP_Webhook_Subscriptions {
 		);
 
 		return new WP_REST_Response(
-			array(
-				'id'           => $id,
-				'object'       => 'webhook_subscription',
-				'callback_url' => $callback_url,
-				'event_types'  => $event_types,
-				'secret'       => $secret, // Returned only on create — agent must store.
-				'created_at'   => $now,
+			UCP_Response::ok(
+				array(
+					'id'           => $id,
+					'object'       => 'webhook_subscription',
+					'callback_url' => $callback_url,
+					'event_types'  => $event_types,
+					'secret'       => $secret, // Returned only on create — agent must store.
+					'created_at'   => $now,
+				)
 			),
 			201
 		);
@@ -134,15 +136,17 @@ final class UCP_Webhook_Subscriptions {
 		}
 		$row = self::find( (string) $request->get_param( 'id' ) );
 		if ( ! $row || $row['client_id'] !== $ctx['client_id'] ) {
-			return new WP_Error( 'not_found', 'Subscription not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Subscription not found', 'recoverable', 404 );
 		}
 		return new WP_REST_Response(
-			array(
-				'id'           => (string) $row['id'],
-				'object'       => 'webhook_subscription',
-				'callback_url' => (string) $row['callback_url'],
-				'event_types'  => json_decode( (string) $row['event_types'], true ),
-				'created_at'   => (string) $row['created_at'],
+			UCP_Response::ok(
+				array(
+					'id'           => (string) $row['id'],
+					'object'       => 'webhook_subscription',
+					'callback_url' => (string) $row['callback_url'],
+					'event_types'  => json_decode( (string) $row['event_types'], true ),
+					'created_at'   => (string) $row['created_at'],
+				)
 			),
 			200
 		);
@@ -162,12 +166,12 @@ final class UCP_Webhook_Subscriptions {
 		$id  = (string) $request->get_param( 'id' );
 		$row = self::find( $id );
 		if ( ! $row || $row['client_id'] !== $ctx['client_id'] ) {
-			return new WP_Error( 'not_found', 'Subscription not found', array( 'status' => 404 ) );
+			return UCP_Response::error( 'not_found', 'Subscription not found', 'recoverable', 404 );
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->delete( UCP_Storage::table( 'webhook_subscriptions' ), array( 'id' => $id ) );
-		return new WP_REST_Response( array( 'deleted' => true, 'id' => $id ), 200 );
+		return new WP_REST_Response( UCP_Response::ok( array( 'deleted' => true, 'id' => $id ) ), 200 );
 	}
 
 	// ── Internal helpers ─────────────────────────────────────────────────

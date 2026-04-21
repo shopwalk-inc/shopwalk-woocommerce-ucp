@@ -99,7 +99,7 @@ final class UCP_Webhook_Delivery {
 	}
 
 	/**
-	 * Build a UCP order event payload and fan it out to every subscription
+	 * Build a full UCP order payload and fan it out to every subscription
 	 * interested in this event type.
 	 *
 	 * @param string $event_type e.g. "order.created".
@@ -111,14 +111,14 @@ final class UCP_Webhook_Delivery {
 		if ( count( $subs ) === 0 ) {
 			return;
 		}
-		$payload = wp_json_encode(
-			array(
-				'event'      => $event_type,
-				'order_id'   => $order_id,
-				'occurred_at' => gmdate( 'c' ),
-			)
-		);
-		$now = current_time( 'mysql', true );
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			return;
+		}
+
+		$payload = wp_json_encode( self::build_order_payload( $order, $event_type ) );
+		$now     = current_time( 'mysql', true );
 
 		global $wpdb;
 		foreach ( $subs as $sub ) {
@@ -135,6 +135,87 @@ final class UCP_Webhook_Delivery {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Build a full UCP-spec order object for webhook delivery.
+	 *
+	 * @param WC_Order $order      The WC order.
+	 * @param string   $event_type The UCP event type.
+	 * @return array
+	 */
+	private static function build_order_payload( $order, string $event_type ): array {
+		$line_items = array();
+		foreach ( $order->get_items() as $idx => $item ) {
+			$fulfilled  = ( $order->get_status() === 'completed' ) ? $item->get_quantity() : 0;
+			$line_items[] = UCP_Response::build_order_line_item( $item, $idx, $fulfilled );
+		}
+
+		// Map WC status to a UCP fulfillment expectation.
+		$wc_status = $order->get_status();
+		$expectations = array();
+		if ( in_array( $wc_status, array( 'processing', 'on-hold' ), true ) ) {
+			$expectations[] = array(
+				'type'    => 'shipping',
+				'status'  => 'pending',
+				'label'   => 'Order is being processed',
+			);
+		} elseif ( $wc_status === 'completed' ) {
+			$expectations[] = array(
+				'type'    => 'shipping',
+				'status'  => 'complete',
+				'label'   => 'Order has been fulfilled',
+			);
+		}
+
+		// Build fulfillment events from order notes/status history.
+		$fulfillment_events = array();
+		$fulfillment_events[] = array(
+			'type'        => 'status_change',
+			'status'      => $wc_status,
+			'occurred_at' => $order->get_date_modified()
+				? $order->get_date_modified()->date( 'c' )
+				: gmdate( 'c' ),
+		);
+
+		// Collect order adjustments (refunds, coupons).
+		$adjustments = array();
+		foreach ( $order->get_refunds() as $refund ) {
+			$adjustments[] = array(
+				'type'   => 'refund',
+				'amount' => UCP_Response::to_cents( abs( (float) $refund->get_total() ) ),
+				'reason' => $refund->get_reason() ?: 'Refund',
+			);
+		}
+		foreach ( $order->get_coupon_codes() as $code ) {
+			$adjustments[] = array(
+				'type'  => 'coupon',
+				'code'  => $code,
+			);
+		}
+
+		return array(
+			'ucp'        => array( 'version' => UCP_Response::VERSION, 'status' => 'ok' ),
+			'event'      => $event_type,
+			'id'         => strval( $order->get_id() ),
+			'label'      => '#' . $order->get_order_number(),
+			'permalink_url' => $order->get_view_order_url(),
+			'currency'   => $order->get_currency(),
+			'line_items' => $line_items,
+			'fulfillment' => array(
+				'expectations' => $expectations,
+				'events'       => $fulfillment_events,
+			),
+			'adjustments' => $adjustments,
+			'totals'      => UCP_Response::build_totals(
+				$order->get_subtotal(),
+				$order->get_shipping_total(),
+				$order->get_total_tax(),
+				$order->get_discount_total(),
+				$order->get_total()
+			),
+			'messages'    => array(),
+		);
 	}
 
 	// ── Delivery worker (WP-Cron) ────────────────────────────────────────
@@ -187,19 +268,30 @@ final class UCP_Webhook_Delivery {
 			return;
 		}
 
-		$payload   = (string) $row['payload'];
-		$signature = UCP_Signing::sign( $payload, (string) $sub['secret'] );
+		$payload    = (string) $row['payload'];
+		$secret     = (string) $sub['secret'];
+		$timestamp  = time();
+		$webhook_id = 'evt_' . wp_generate_uuid4();
+
+		// Content-Digest (SHA-256 of body).
+		$digest = base64_encode( hash( 'sha256', $payload, true ) );
+
+		// HMAC signature over the signed content per UCP spec.
+		$signed_content = $webhook_id . '.' . $timestamp . '.' . $payload;
+		$signature      = base64_encode( hash_hmac( 'sha256', $signed_content, $secret, true ) );
 
 		$response = wp_remote_post(
 			(string) $sub['callback_url'],
 			array(
 				'timeout' => 15,
 				'headers' => array(
-					'Content-Type'      => 'application/json',
-					'User-Agent'        => 'shopwalk-ai-plugin/' . SHOPWALK_AI_VERSION . ' (UCP)',
-					'X-UCP-Event'       => (string) $row['event_type'],
-					'X-UCP-Subscription' => (string) $sub['id'],
-					'Request-Signature' => $signature,
+					'Content-Type'    => 'application/json',
+					'Webhook-Timestamp' => strval( $timestamp ),
+					'Webhook-Id'      => $webhook_id,
+					'UCP-Agent'       => 'profile="' . get_site_url() . '/.well-known/ucp"',
+					'Content-Digest'  => 'sha-256=:' . $digest . ':',
+					'Signature-Input' => 'sig1=("content-digest" "webhook-id" "webhook-timestamp");keyid="store-hmac";alg="hmac-sha256"',
+					'Signature'       => 'sig1=:' . $signature . ':',
 				),
 				'body'    => $payload,
 			)

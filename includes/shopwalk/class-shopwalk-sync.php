@@ -99,8 +99,11 @@ final class Shopwalk_Sync {
 			$this->flush();
 		}
 
-		if ( function_exists( 'error_log' ) ) {
-			error_log( sprintf( '[Shopwalk] Push sync complete: %d products queued and flushed (reason: %s)', $count, $reason ) );
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->info(
+				sprintf( 'Push sync complete: %d products queued and flushed (reason: %s)', $count, $reason ),
+				array( 'source' => 'shopwalk-ai' )
+			);
 		}
 	}
 
