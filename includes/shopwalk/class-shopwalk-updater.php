@@ -48,7 +48,7 @@ final class Shopwalk_Updater {
 	 * Initialize the updater.
 	 */
 	public function __construct() {
-		$this->plugin_basename = plugin_basename( SHOPWALK_AI_PLUGIN_FILE );
+		$this->plugin_basename = plugin_basename( WOOCOMMERCE_UCP_PLUGIN_FILE );
 		$this->plugin_slug     = dirname( $this->plugin_basename );
 
 		// Inject update info into WordPress's update check.
@@ -86,7 +86,7 @@ final class Shopwalk_Updater {
 			return $transient;
 		}
 
-		$current_version = SHOPWALK_AI_VERSION;
+		$current_version = WOOCOMMERCE_UCP_VERSION;
 
 		if ( version_compare( $remote['version'], $current_version, '>' ) ) {
 			// Build download URL with license key as query param so WP's
@@ -139,7 +139,7 @@ final class Shopwalk_Updater {
 		return (object) array(
 			'name'          => 'WooCommerce UCP — Universal Commerce Protocol',
 			'slug'          => $this->plugin_slug,
-			'version'       => $remote['version'] ?? SHOPWALK_AI_VERSION,
+			'version'       => $remote['version'] ?? WOOCOMMERCE_UCP_VERSION,
 			'author'        => '<a href="https://shopwalk.com">Shopwalk, Inc.</a>',
 			'homepage'      => 'https://shopwalk.com/woocommerce',
 			'requires'      => '6.0',
@@ -263,7 +263,7 @@ final class Shopwalk_Updater {
 		}
 
 		$headers = array(
-			'User-Agent' => 'woocommerce-ucp-plugin/' . SHOPWALK_AI_VERSION,
+			'User-Agent' => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
 		);
 
 		// Include license key for authenticated version check.

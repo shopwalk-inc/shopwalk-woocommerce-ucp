@@ -250,7 +250,7 @@ final class Shopwalk_Sync {
 					'Content-Type'     => 'application/json',
 					'X-SW-License-Key' => Shopwalk_License::key(),
 					'X-SW-Domain'      => $domain ? $domain : $site_url,
-					'User-Agent'       => 'woocommerce-ucp-plugin/' . SHOPWALK_AI_VERSION,
+					'User-Agent'       => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
 				),
 				'body'    => wp_json_encode(
 					array(
