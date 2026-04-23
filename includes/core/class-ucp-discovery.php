@@ -105,7 +105,7 @@ final class UCP_Discovery {
 				'platform' => 'woocommerce',
 				'plugin'   => array(
 					'name'    => 'WooCommerce UCP Adapter',
-					'version' => SHOPWALK_AI_VERSION,
+					'version' => WOOCOMMERCE_UCP_VERSION,
 				),
 			),
 			200

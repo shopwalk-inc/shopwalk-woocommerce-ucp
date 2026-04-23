@@ -64,7 +64,7 @@ final class WooCommerce_UCP {
 	 * @return void
 	 */
 	private function load_updater(): void {
-		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-updater.php';
+		require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-updater.php';
 		new Shopwalk_Updater();
 	}
 
@@ -74,7 +74,7 @@ final class WooCommerce_UCP {
 	 * @return void
 	 */
 	private function load_core(): void {
-		$dir = SHOPWALK_AI_PLUGIN_DIR . 'includes/core/';
+		$dir = WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/core/';
 
 		// Storage layer is loaded first — every other class queries it.
 		require_once $dir . 'class-ucp-storage.php';
@@ -125,7 +125,7 @@ final class WooCommerce_UCP {
 	 * @return void
 	 */
 	private function load_shopwalk(): void {
-		$dir = SHOPWALK_AI_PLUGIN_DIR . 'includes/shopwalk/';
+		$dir = WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/shopwalk/';
 
 		require_once $dir . 'class-shopwalk-license.php';
 		require_once $dir . 'class-shopwalk-sync.php';
@@ -157,7 +157,7 @@ final class WooCommerce_UCP {
 		if ( ! is_admin() ) {
 			return;
 		}
-		$dir = SHOPWALK_AI_PLUGIN_DIR . 'includes/admin/';
+		$dir = WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/admin/';
 		require_once $dir . 'class-dashboard.php';
 		require_once $dir . 'class-self-test.php';
 
@@ -186,11 +186,11 @@ final class WooCommerce_UCP {
 	 * @return void
 	 */
 	public static function activate(): void {
-		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/core/class-ucp-storage.php';
+		require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/core/class-ucp-storage.php';
 		UCP_Storage::install();
 
 		// Generate the store signing keypair if it doesn't exist yet.
-		require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/core/class-ucp-signing.php';
+		require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/core/class-ucp-signing.php';
 		UCP_Signing::ensure_store_keypair();
 
 		// Schedule cron jobs for session cleanup + webhook delivery.
@@ -222,11 +222,11 @@ final class WooCommerce_UCP {
 		// Auto-populate license key from optional bundled config file.
 		// Store the key now; activation against shopwalk-api happens on
 		// plugins_loaded (see init_instance) when Shopwalk_License is available.
-		if ( file_exists( SHOPWALK_AI_PLUGIN_DIR . 'shopwalk-ai-config.php' ) ) {
-			require_once SHOPWALK_AI_PLUGIN_DIR . 'shopwalk-ai-config.php';
+		if ( file_exists( WOOCOMMERCE_UCP_PLUGIN_DIR . 'woocommerce-ucp-config.php' ) ) {
+			require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'woocommerce-ucp-config.php';
 		}
-		if ( defined( 'SHOPWALK_AI_PREFILLED_LICENSE' ) && ! get_option( 'shopwalk_license_key' ) ) {
-			update_option( 'shopwalk_license_key', SHOPWALK_AI_PREFILLED_LICENSE );
+		if ( defined( 'WOOCOMMERCE_UCP_PREFILLED_LICENSE' ) && ! get_option( 'shopwalk_license_key' ) ) {
+			update_option( 'shopwalk_license_key', WOOCOMMERCE_UCP_PREFILLED_LICENSE );
 			// Flag that activation is pending — handled on next page load.
 			update_option( 'shopwalk_license_needs_activation', '1' );
 		}

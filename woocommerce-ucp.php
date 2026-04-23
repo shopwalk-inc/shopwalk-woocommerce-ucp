@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce UCP — Universal Commerce Protocol
  * Plugin URI:  https://github.com/shopwalk-inc/woocommerce-ucp
  * Description: Make any WooCommerce store fully purchasable by UCP-compliant AI shopping agents. Implements the Universal Commerce Protocol (ucp.dev) — checkout, OAuth identity, orders, webhooks. Optional Shopwalk network integration available with a free license.
- * Version:     3.0.42
+ * Version:     3.0.43
  * Author:      Shopwalk, Inc.
  * Author URI:  https://shopwalk.com
  * Requires Plugins: woocommerce
@@ -23,10 +23,10 @@ defined( 'ABSPATH' ) || exit;
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-define( 'SHOPWALK_AI_VERSION', '3.0.42' );
-define( 'SHOPWALK_AI_PLUGIN_FILE', __FILE__ );
-define( 'SHOPWALK_AI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'SHOPWALK_AI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'WOOCOMMERCE_UCP_VERSION', '3.0.43' );
+define( 'WOOCOMMERCE_UCP_PLUGIN_FILE', __FILE__ );
+define( 'WOOCOMMERCE_UCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WOOCOMMERCE_UCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 // UCP namespace + table prefix.
 define( 'UCP_REST_NAMESPACE', 'ucp/v1' );
@@ -65,7 +65,7 @@ register_deactivation_hook( __FILE__, array( 'WooCommerce_UCP', 'deactivate' ) )
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
 
-require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/class-woocommerce-ucp.php';
+require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/class-woocommerce-ucp.php';
 
 add_action( 'plugins_loaded', array( 'WooCommerce_UCP', 'instance' ), 5 );
 

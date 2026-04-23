@@ -49,7 +49,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		if ( $hook !== 'toplevel_page_woocommerce-ucp' ) {
 			return;
 		}
-		wp_register_script( 'woocommerce-ucp-admin', '', array(), SHOPWALK_AI_VERSION, true );
+		wp_register_script( 'woocommerce-ucp-admin', '', array(), WOOCOMMERCE_UCP_VERSION, true );
 		wp_enqueue_script( 'woocommerce-ucp-admin' );
 		wp_add_inline_script(
 			'woocommerce-ucp-admin',
@@ -126,7 +126,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 			</div>
 
 			<p class="sw-muted">
-				<?php echo esc_html( sprintf( '%d products · Plugin v%s', $product_count, SHOPWALK_AI_VERSION ) ); ?>
+				<?php echo esc_html( sprintf( '%d products · Plugin v%s', $product_count, WOOCOMMERCE_UCP_VERSION ) ); ?>
 			</p>
 
 			<p>
@@ -940,7 +940,7 @@ JS;
 			'https://api.shopwalk.com/api/v1/public/ucp/probe',
 			array(
 				'timeout' => 15,
-				'headers' => array( 'Content-Type' => 'application/json', 'User-Agent' => 'woocommerce-ucp-plugin/' . SHOPWALK_AI_VERSION ),
+				'headers' => array( 'Content-Type' => 'application/json', 'User-Agent' => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION ),
 				'body'    => wp_json_encode( array( 'store_url' => home_url() ) ),
 			)
 		);
@@ -966,7 +966,7 @@ JS;
 
 		// Validate the new key BEFORE replacing the old one
 		if ( ! class_exists( 'Shopwalk_License' ) ) {
-			require_once SHOPWALK_AI_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-license.php';
+			require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-license.php';
 		}
 
 		$result = Shopwalk_License::activate( $new_key );

@@ -50,7 +50,7 @@ final class UCP_Store {
 				'shopwalk_connected'  => ! empty( $license_key ),
 				'shopwalk_partner_id' => get_option( 'shopwalk_partner_id', '' ),
 				'ucp_version'         => '1.0',
-				'plugin_version'      => defined( 'SHOPWALK_AI_VERSION' ) ? SHOPWALK_AI_VERSION : '',
+				'plugin_version'      => defined( 'WOOCOMMERCE_UCP_VERSION' ) ? WOOCOMMERCE_UCP_VERSION : '',
 			),
 			200
 		);
