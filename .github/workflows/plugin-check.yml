@@ -1,0 +1,33 @@
+name: WordPress.org Plugin Check
+
+# Runs the same automated checks the wordpress.org submission review
+# uses. Surfaces issues our local phpcs.xml deliberately relaxes (e.g.
+# 1-min cron interval, @unlink) so we have a story for them BEFORE a
+# WP.org reviewer flags them.
+#
+# Action source: https://github.com/WordPress/plugin-check-action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  plugin-check:
+    name: WP.org Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Plugin Check
+        uses: WordPress/plugin-check-action@v1
+        with:
+          # Match the categories WP.org actually gates on. We omit
+          # `late_escaping` for now (advisory; not a submission blocker).
+          checks: 'plugin_repo,security,performance,i18n,accessibility'
+          # Errors fail the job; warnings stay visible but don't block.
+          # Submission warnings still need a documented rationale (see
+          # RELEASE.md) so the reviewer has our story.
+          exclude-checks: ''
