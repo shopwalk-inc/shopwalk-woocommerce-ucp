@@ -39,10 +39,10 @@ jobs:
       - name: Verify WordPress standard is installed
         run: phpcs -i
 
-      - name: Run phpcs (WordPress ruleset)
+      - name: Run phpcs (project ruleset)
         run: |
-          phpcs --standard=WordPress \
-                --extensions=php \
-                --ignore=vendor/,tests/,node_modules/ \
-                --report=checkstyle \
-                -q . | cs2pr
+          # Use the project's phpcs.xml (which extends WordPress + adds
+          # the relaxations / capability allow-list documented in-file).
+          # Don't pass --standard inline — phpcs auto-discovers phpcs.xml
+          # in cwd, which is what we want.
+          phpcs --report=checkstyle -q | cs2pr
