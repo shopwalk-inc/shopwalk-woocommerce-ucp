@@ -6,7 +6,7 @@ Tested up to: 6.8
 Requires PHP: 8.1
 WC requires at least: 8.0
 WC tested up to: 9.8
-Stable tag: 3.0.45
+Stable tag: 3.0.46
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,12 @@ Shopwalk Privacy Policy: https://shopwalk.com/privacy
 4. Optional Shopwalk connect flow. Enter a free Shopwalk license to enable real-time push sync, brand voice, and Premier listing on shopwalk.com.
 
 == Changelog ==
+
+= 3.0.46 =
+* Wire the WP Admin dashboard to live license state instead of hardcoded literals. The "Connected" badge on the Shopwalk panel and the License → Status pill now reflect the real license status returned by shopwalk-api (`active` | `expired` | `revoked`); the green pill flips to red on revocation rather than always reading "Active".
+* Add `Shopwalk_License::is_connected()` (true iff status is `active` AND the API has been heard from in the last 24h) and `Shopwalk_License::status()` helpers; expand `Shopwalk_License::activate()` to capture and persist `plan` / `plan_label` / `next_billing_date` / `status` from the API response, and to write a `shopwalk_last_heartbeat_at` timestamp on every successful contact. Hourly status poll now also refreshes these options.
+* Drop the fake `/ 500` denominator from the dashboard sync queue counter — the queue is uncapped, so the denominator was fictional. Now shows the queue depth as a single number.
+* Plan label fallback no longer defaults to "Pro" — empty / unknown plans now read as "Free" (or empty for unlabelled Pro responses) so free partners never see a "Pro" label by mistake.
 
 = 3.0.45 =
 * WP.org compliance pass: bump WC tested up to 9.8, rename `shopwalk_ai_*` cron hooks to `shopwalk_ucp_*`, add WordPress Coding Standards (`phpcs.xml`), create `languages/` directory for translations.

@@ -286,5 +286,21 @@ final class Shopwalk_Connect {
 		update_option( self::OPTION_PLAN, $tier, false );
 		update_option( self::OPTION_STATUS, $substat, false );
 		update_option( self::OPTION_LAST_POLL, time(), false );
+
+		// Mirror the API's license-state fields onto the options
+		// Shopwalk_License::status() / ::is_connected() read from. The
+		// `status` field is the source of truth for the dashboard pill;
+		// `last_heartbeat_at` drives the "Connected" badge freshness check.
+		// We keep the old subscription_status write above for back-compat,
+		// but the new options are what the License helpers consult.
+		$license_status = (string) ( $body['status'] ?? 'active' );
+		update_option( 'shopwalk_license_status', $license_status, false );
+		update_option( 'shopwalk_last_heartbeat_at', time(), false );
+		if ( ! empty( $body['plan_label'] ) ) {
+			update_option( 'shopwalk_plan_label', (string) $body['plan_label'], false );
+		}
+		if ( ! empty( $body['next_billing_date'] ) ) {
+			update_option( 'shopwalk_next_billing_at', (string) $body['next_billing_date'], false );
+		}
 	}
 }

@@ -22,18 +22,26 @@ final class Shopwalk_Dashboard_Panel {
 	 * @return void
 	 */
 	public static function render(): void {
-		$pid        = Shopwalk_License::partner_id();
-		$licenseKey = Shopwalk_License::key();
-		$queued     = count( (array) get_option( 'shopwalk_sync_queue', array() ) );
-		$syncState  = (array) get_option( 'shopwalk_sync_state', array() );
-		$lastSync   = ! empty( $syncState['completed_at'] ) ? human_time_diff( (int) $syncState['completed_at'] ) . ' ago' : 'Never';
+		$pid          = Shopwalk_License::partner_id();
+		$license_key  = Shopwalk_License::key();
+		$is_connected = Shopwalk_License::is_connected();
+		$queued       = count( (array) get_option( 'shopwalk_sync_queue', array() ) );
+		$sync_state   = (array) get_option( 'shopwalk_sync_state', array() );
+		$last_sync    = ! empty( $sync_state['completed_at'] ) ? human_time_diff( (int) $sync_state['completed_at'] ) . ' ago' : __( 'Never', 'woocommerce-ucp' );
 		?>
 		<div class="ucp-card">
-			<h2><?php esc_html_e( 'Shopwalk', 'woocommerce-ucp' ); ?> <span class="status-pill ok">✅ Connected</span></h2>
-			<?php if ( '' !== $licenseKey ) : ?>
+			<h2>
+				<?php esc_html_e( 'Shopwalk', 'woocommerce-ucp' ); ?>
+				<?php if ( $is_connected ) : ?>
+					<span class="status-pill ok">✅ <?php esc_html_e( 'Connected', 'woocommerce-ucp' ); ?></span>
+				<?php else : ?>
+					<span class="status-pill warn">⚠ <?php esc_html_e( 'Not connected', 'woocommerce-ucp' ); ?></span>
+				<?php endif; ?>
+			</h2>
+			<?php if ( '' !== $license_key ) : ?>
 				<p>
 					<strong><?php esc_html_e( 'License Key:', 'woocommerce-ucp' ); ?></strong>
-					<code><?php echo esc_html( $licenseKey ); ?></code>
+					<code><?php echo esc_html( $license_key ); ?></code>
 				</p>
 			<?php endif; ?>
 			<?php if ( '' !== $pid ) : ?>
@@ -44,10 +52,10 @@ final class Shopwalk_Dashboard_Panel {
 			<?php endif; ?>
 			<p>
 				<?php esc_html_e( 'Sync queue:', 'woocommerce-ucp' ); ?>
-				<?php echo (int) $queued; ?> / 500
+				<?php echo (int) $queued; ?>
 				&nbsp;·&nbsp;
 				<?php esc_html_e( 'Last sync:', 'woocommerce-ucp' ); ?>
-				<?php echo esc_html( $lastSync ); ?>
+				<?php echo esc_html( $last_sync ); ?>
 			</p>
 			<p>
 				<a class="button" href="<?php echo esc_url( SHOPWALK_PARTNERS_URL . '/dashboard' ); ?>" target="_blank" rel="noopener">

@@ -226,11 +226,18 @@ final class WooCommerce_UCP_Admin_Dashboard {
 	// ── License ────────────────────────────────────────────────────────────
 
 	private function render_license_tool( string $tier ): void {
-		$license_key = class_exists( 'Shopwalk_License' ) ? Shopwalk_License::key() : '';
-		$partner_id  = class_exists( 'Shopwalk_License' ) ? Shopwalk_License::partner_id() : '';
-		$plan        = get_option( 'shopwalk_plan', 'free' );
-		$plan_label  = 'pro' === $plan ? get_option( 'shopwalk_plan_label', 'Pro' ) : 'Free';
-		$next_bill   = get_option( 'shopwalk_next_billing', '' );
+		$license_key   = class_exists( 'Shopwalk_License' ) ? Shopwalk_License::key() : '';
+		$partner_id    = class_exists( 'Shopwalk_License' ) ? Shopwalk_License::partner_id() : '';
+		$license_state = class_exists( 'Shopwalk_License' ) ? Shopwalk_License::status() : 'unlicensed';
+		$plan          = get_option( 'shopwalk_plan', 'free' );
+		// No fallback to "Pro" — show whatever the API actually told us, and
+		// default to "Free" for any non-pro plan so we never imply paid status
+		// for a free or unrecognised plan.
+		$plan_label = (string) get_option( 'shopwalk_plan_label', '' );
+		if ( '' === $plan_label ) {
+			$plan_label = 'pro' === $plan ? '' : 'Free';
+		}
+		$next_bill = get_option( 'shopwalk_next_billing_at', get_option( 'shopwalk_next_billing', '' ) );
 		?>
 		<div class="sw-card">
 			<h2>
@@ -280,7 +287,27 @@ final class WooCommerce_UCP_Admin_Dashboard {
 					</tr>
 					<tr><td><?php esc_html_e( 'Partner ID', 'woocommerce-ucp' ); ?></td><td><code><?php echo esc_html( $partner_id ); ?></code></td></tr>
 					<tr><td><?php esc_html_e( 'Plan', 'woocommerce-ucp' ); ?></td><td><?php echo esc_html( $plan_label ); ?></td></tr>
-					<tr><td><?php esc_html_e( 'Status', 'woocommerce-ucp' ); ?></td><td>✅ <?php esc_html_e( 'Active', 'woocommerce-ucp' ); ?></td></tr>
+					<tr>
+						<td><?php esc_html_e( 'Status', 'woocommerce-ucp' ); ?></td>
+						<td>
+							<?php
+							switch ( $license_state ) {
+								case 'active':
+									echo '✅ ' . esc_html__( 'Active', 'woocommerce-ucp' );
+									break;
+								case 'expired':
+									echo '⏳ ' . esc_html__( 'Expired', 'woocommerce-ucp' );
+									break;
+								case 'revoked':
+									echo '⛔ ' . esc_html__( 'Revoked', 'woocommerce-ucp' );
+									break;
+								default:
+									echo '— ' . esc_html__( 'Unknown', 'woocommerce-ucp' );
+									break;
+							}
+							?>
+						</td>
+					</tr>
 					<tr><td><?php esc_html_e( 'Domain', 'woocommerce-ucp' ); ?></td><td><?php echo esc_html( wp_parse_url( home_url(), PHP_URL_HOST ) ); ?></td></tr>
 					<?php if ( 'pro' === $tier && $next_bill ) : ?>
 						<tr><td><?php esc_html_e( 'Next billing', 'woocommerce-ucp' ); ?></td><td><?php echo esc_html( $next_bill ); ?></td></tr>
@@ -1116,16 +1143,12 @@ JS;
 
 		$result = Shopwalk_License::activate( $new_key );
 		if ( $result['ok'] ?? false ) {
-			// Refresh plan from API response
-			$plan = $result['plan'] ?? 'free';
-			update_option( 'shopwalk_plan', $plan );
-			if ( ! empty( $result['plan_label'] ) ) {
-				update_option( 'shopwalk_plan_label', $result['plan_label'] );
-			}
-			if ( ! empty( $result['next_billing_date'] ) ) {
-				update_option( 'shopwalk_next_billing', $result['next_billing_date'] );
-			}
-			wp_send_json_success( array( 'message' => 'License activated. Plan: ' . ucfirst( $plan ) ) );
+			// Shopwalk_License::activate() persists plan / plan_label /
+			// next_billing_date / status to options itself; we just relay
+			// the user-facing message here.
+			$plan = $result['plan'] ?? '';
+			$msg  = '' !== $plan ? 'License activated. Plan: ' . ucfirst( $plan ) : 'License activated.';
+			wp_send_json_success( array( 'message' => $msg ) );
 		} else {
 			wp_send_json_error( array( 'message' => $result['message'] ?? 'Activation failed.' ) );
 		}
@@ -1149,17 +1172,8 @@ JS;
 		$result = Shopwalk_License::activate( $key );
 		$valid  = $result['ok'] ?? false;
 		$plan   = $result['plan'] ?? 'free';
-
-		// Update cached plan
-		if ( $valid ) {
-			update_option( 'shopwalk_plan', $plan );
-			if ( ! empty( $result['plan_label'] ) ) {
-				update_option( 'shopwalk_plan_label', $result['plan_label'] );
-			}
-			if ( ! empty( $result['next_billing_date'] ) ) {
-				update_option( 'shopwalk_next_billing', $result['next_billing_date'] );
-			}
-		}
+		// Persistence happens inside Shopwalk_License::activate(); nothing
+		// to do here beyond shaping the ajax response.
 
 		wp_send_json_success(
 			array(
@@ -1183,6 +1197,7 @@ JS;
 		delete_option( 'shopwalk_plan' );
 		delete_option( 'shopwalk_plan_label' );
 		delete_option( 'shopwalk_next_billing' );
+		delete_option( 'shopwalk_next_billing_at' );
 		delete_option( 'shopwalk_sync_state' );
 		delete_option( 'shopwalk_sync_history' );
 
