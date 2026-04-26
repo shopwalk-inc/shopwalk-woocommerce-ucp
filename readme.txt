@@ -3,7 +3,7 @@ Contributors: shopwalkinc
 Tags: woocommerce, ai, ucp, agent, commerce
 Requires at least: 6.0
 Tested up to: 6.8
-Requires PHP: 8.0
+Requires PHP: 8.1
 WC requires at least: 8.0
 WC tested up to: 9.8
 Stable tag: 3.0.45
@@ -120,6 +120,7 @@ Shopwalk Privacy Policy: https://shopwalk.com/privacy
 * WP.org compliance pass: bump WC tested up to 9.8, rename `shopwalk_ai_*` cron hooks to `shopwalk_ucp_*`, add WordPress Coding Standards (`phpcs.xml`), create `languages/` directory for translations.
 * Bump `Tested up to: 6.8`. Generate `languages/woocommerce-ucp.pot` for translators.
 * Add `Screenshots` section to readme.
+* Bump `Requires PHP: 8.1` (was 8.0). PHP 8.0 has been EOL since November 2023; the dev toolchain (PHPUnit 10+, sebastian/*) requires 8.1 as well. CI matrix now tests 8.1 / 8.2 / 8.3.
 
 = 3.0.0 =
 **Complete rewrite as a UCP-compliant adapter.** The plugin's primary identity is now "the UCP adapter for WooCommerce." Shopwalk integration is one of several features layered on top.
