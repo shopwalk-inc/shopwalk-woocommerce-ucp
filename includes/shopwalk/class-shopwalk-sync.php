@@ -178,6 +178,13 @@ final class Shopwalk_Sync {
 		$queue   = (array) get_option( self::QUEUE_OPTION, array() );
 		$queue[] = $event;
 		update_option( self::QUEUE_OPTION, $queue, false );
+
+		// Drain ASAP via single-event. WP-Cron loopback fires this on the
+		// next pageload (typically seconds later) instead of waiting up to
+		// 5 min for the recurring backstop.
+		if ( ! wp_next_scheduled( 'shopwalk_flush_queue' ) || wp_next_scheduled( 'shopwalk_flush_queue' ) > time() + 30 ) {
+			wp_schedule_single_event( time() + 5, 'shopwalk_flush_queue' );
+		}
 	}
 
 	/**

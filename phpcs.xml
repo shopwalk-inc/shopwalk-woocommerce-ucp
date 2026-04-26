@@ -70,14 +70,6 @@
 	<rule ref="Universal.Operators.DisallowShortTernary"><severity>0</severity></rule>
 
 	<!--
-		`@unlink()` and friends are the standard pattern in WP for "try
-		to delete this scratch file; don't care if it isn't there." We
-		could route through WP_Filesystem but it adds a hard runtime
-		dependency on the FS API; the @ here is intentional.
-	-->
-	<rule ref="WordPress.PHP.NoSilencedErrors"><severity>0</severity></rule>
-
-	<!--
 		Unused-parameter warnings fire on interface implementations and
 		WP filter callbacks where the signature is fixed by WP. The
 		params have to be there; we just don't always read them.

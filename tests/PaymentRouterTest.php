@@ -10,6 +10,7 @@ use Brain\Monkey;
 use Brain\Monkey\Filters;
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/../includes/core/interface-ucp-payment-adapter.php';
 require_once __DIR__ . '/../includes/core/class-ucp-payment-router.php';
 
 // Test doubles — one ready, one not-ready, both record calls for assertions.

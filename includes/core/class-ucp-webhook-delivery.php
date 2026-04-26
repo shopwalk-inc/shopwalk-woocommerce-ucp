@@ -135,6 +135,14 @@ final class UCP_Webhook_Delivery {
 				)
 			);
 		}
+
+		// Drain ASAP via single-event. WP-Cron loopback fires this on the
+		// next pageload — typically within seconds — instead of waiting up
+		// to 5 minutes for the recurring backstop. Built-in dedup folds
+		// rapid bursts into one fire.
+		if ( ! wp_next_scheduled( 'shopwalk_ucp_webhook_flush' ) || wp_next_scheduled( 'shopwalk_ucp_webhook_flush' ) > time() + 30 ) {
+			wp_schedule_single_event( time() + 5, 'shopwalk_ucp_webhook_flush' );
+		}
 	}
 
 	/**
