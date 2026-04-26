@@ -58,15 +58,15 @@ final class WooCommerce_UCP_Admin_Dashboard {
 				array(
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonces'  => array(
-						'self_test'       => wp_create_nonce( 'shopwalk_self_test' ),
-						'probe'           => wp_create_nonce( 'shopwalk_probe' ),
-						'activate'        => wp_create_nonce( 'shopwalk_activate' ),
-						'test_license'    => wp_create_nonce( 'shopwalk_test_license' ),
-						'disconnect'      => wp_create_nonce( 'shopwalk_disconnect' ),
+						'self_test'        => wp_create_nonce( 'shopwalk_self_test' ),
+						'probe'            => wp_create_nonce( 'shopwalk_probe' ),
+						'activate'         => wp_create_nonce( 'shopwalk_activate' ),
+						'test_license'     => wp_create_nonce( 'shopwalk_test_license' ),
+						'disconnect'       => wp_create_nonce( 'shopwalk_disconnect' ),
 						'toggle_discovery' => wp_create_nonce( 'shopwalk_toggle_discovery' ),
-						'sync_status'     => wp_create_nonce( 'shopwalk_sync_status' ),
-						'payments_status' => wp_create_nonce( 'shopwalk_payments_status' ),
-						'upgrade_url'     => wp_create_nonce( 'shopwalk_upgrade_url' ),
+						'sync_status'      => wp_create_nonce( 'shopwalk_sync_status' ),
+						'payments_status'  => wp_create_nonce( 'shopwalk_payments_status' ),
+						'upgrade_url'      => wp_create_nonce( 'shopwalk_upgrade_url' ),
 					),
 				)
 			) . ';' . $this->admin_js()
@@ -1270,7 +1270,7 @@ JS;
 			wp_send_json_error( array( 'message' => 'Shopwalk not connected.' ), 400 );
 		}
 		$enable = isset( $_POST['enable'] ) && '1' === $_POST['enable'];
-		$ok = $enable ? Shopwalk_License::resume_discovery() : Shopwalk_License::pause_discovery();
+		$ok     = $enable ? Shopwalk_License::resume_discovery() : Shopwalk_License::pause_discovery();
 		if ( ! $ok ) {
 			wp_send_json_error(
 				array(
