@@ -78,6 +78,67 @@ final class WooCommerce_UCP_Admin_Dashboard {
 	 * back to the dashboard with ?sw_connect=(ok|declined|state_mismatch|exchange_failed)
 	 * after consuming the code.
 	 */
+	/**
+	 * Renders the Shopwalk status banner inline. Fetched server-side via
+	 * wp_remote_get so the WP admin never makes a cross-origin call to
+	 * api.shopwalk.com — see "Design A" rule: WP admin never calls the
+	 * Shopwalk API directly from the browser.
+	 *
+	 * Cached for 5 minutes (`shopwalk_status_banner` transient) so admin
+	 * page loads don't add a remote round-trip on every render. Failures
+	 * are silent — the banner is informational, not critical.
+	 */
+	private function render_status_banner(): void {
+		$cached = get_transient( 'shopwalk_status_banner' );
+		if ( false === $cached ) {
+			$response = wp_remote_get(
+				SHOPWALK_API_BASE . '/status/banner',
+				array(
+					'timeout' => 5,
+					'headers' => array(
+						'User-Agent' => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
+					),
+				)
+			);
+			$cached = '';
+			if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+				$body = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( is_array( $body ) && ! empty( $body['active'] ) && ! empty( $body['message'] ) ) {
+					$cached = wp_json_encode( $body );
+				}
+			}
+			set_transient( 'shopwalk_status_banner', $cached, 5 * MINUTE_IN_SECONDS );
+		}
+		if ( '' === $cached ) {
+			return;
+		}
+		$banner = json_decode( $cached, true );
+		if ( ! is_array( $banner ) ) {
+			return;
+		}
+
+		$type    = isset( $banner['type'] ) ? (string) $banner['type'] : 'info';
+		$message = isset( $banner['message'] ) ? (string) $banner['message'] : '';
+		if ( '' === $message ) {
+			return;
+		}
+
+		$palette = array(
+			'maintenance' => array( 'bg' => '#eff6ff', 'border' => '#bfdbfe', 'icon' => '🔧' ),
+			'warning'     => array( 'bg' => '#fefce8', 'border' => '#fef08a', 'icon' => '⚠️' ),
+			'info'        => array( 'bg' => '#f0f9ff', 'border' => '#bae6fd', 'icon' => 'ℹ️' ),
+		);
+		$c = isset( $palette[ $type ] ) ? $palette[ $type ] : $palette['info'];
+
+		printf(
+			'<div style="background:%1$s;border:1px solid %2$s;border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px;">%3$s %4$s <a href="https://shopwalk.com/status" target="_blank" rel="noopener" style="margin-left:8px;">View status →</a></div>',
+			esc_attr( $c['bg'] ),
+			esc_attr( $c['border'] ),
+			esc_html( $c['icon'] ),
+			esc_html( $message )
+		);
+	}
+
 	private function render_connect_notice(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only notice
 		$state = isset( $_GET['sw_connect'] ) ? sanitize_text_field( wp_unslash( $_GET['sw_connect'] ) ) : '';
@@ -145,7 +206,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 
 			<?php $this->render_styles(); ?>
 			<?php $this->render_connect_notice(); ?>
-			<div id="sw-status-banner"></div>
+			<?php $this->render_status_banner(); ?>
 			<?php $this->render_ucp_tool( $tier ); ?>
 			<?php $this->render_payments_tool(); ?>
 			<?php if ( 'unlicensed' !== $tier ) : ?>
@@ -759,23 +820,6 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		});
 	}
 
-	// ── Status Banner (from Shopwalk API) ───────────────────────────────
-	var bannerEl = $('sw-status-banner');
-	if (bannerEl) {
-		fetch('https://api.shopwalk.com/api/v1/status/banner')
-			.then(function (r) { return r.json(); })
-			.then(function (d) {
-				if (!d || !d.active || !d.message) return;
-				var colors = {
-					maintenance: { bg: '#eff6ff', border: '#bfdbfe', icon: '🔧' },
-					warning:     { bg: '#fefce8', border: '#fef08a', icon: '⚠️' },
-					info:        { bg: '#f0f9ff', border: '#bae6fd', icon: 'ℹ️' }
-				};
-				var c = colors[d.type] || colors.info;
-				bannerEl.innerHTML = '<div style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px;">' + c.icon + ' ' + esc(d.message) + ' <a href="https://shopwalk.com/status" target="_blank" style="margin-left:8px;">View status →</a></div>';
-			})
-			.catch(function () {});
-	}
 })();
 JS;
 	}
