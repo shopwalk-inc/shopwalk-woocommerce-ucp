@@ -163,7 +163,7 @@ final class Shopwalk_License {
 				'headers' => array(
 					'Content-Type' => 'application/json',
 					'X-API-Key'    => $license_key,
-					'User-Agent'   => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
+					'User-Agent'   => 'ucp-for-woocommerce-plugin/' . WOOCOMMERCE_UCP_VERSION,
 				),
 				'body'    => wp_json_encode(
 					array(

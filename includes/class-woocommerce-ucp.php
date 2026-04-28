@@ -50,22 +50,10 @@ final class WooCommerce_UCP {
 	 */
 	private function __construct() {
 		$this->load_core();
-		$this->load_updater(); // Always load — updates must work even without a license
 		if ( $this->is_shopwalk_connected() ) {
 			$this->load_shopwalk();
 		}
 		$this->load_admin();
-	}
-
-	/**
-	 * Load the auto-updater. Runs unconditionally — a store must be able to
-	 * receive plugin updates regardless of license/connection status.
-	 *
-	 * @return void
-	 */
-	private function load_updater(): void {
-		require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'includes/shopwalk/class-shopwalk-updater.php';
-		new Shopwalk_Updater();
 	}
 
 	/**
@@ -236,8 +224,8 @@ final class WooCommerce_UCP {
 		// Auto-populate license key from optional bundled config file.
 		// Store the key now; activation against shopwalk-api happens on
 		// plugins_loaded (see init_instance) when Shopwalk_License is available.
-		if ( file_exists( WOOCOMMERCE_UCP_PLUGIN_DIR . 'woocommerce-ucp-config.php' ) ) {
-			require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'woocommerce-ucp-config.php';
+		if ( file_exists( WOOCOMMERCE_UCP_PLUGIN_DIR . 'ucp-for-woocommerce-config.php' ) ) {
+			require_once WOOCOMMERCE_UCP_PLUGIN_DIR . 'ucp-for-woocommerce-config.php';
 		}
 		if ( defined( 'WOOCOMMERCE_UCP_PREFILLED_LICENSE' ) && ! get_option( 'shopwalk_license_key' ) ) {
 			update_option( 'shopwalk_license_key', WOOCOMMERCE_UCP_PREFILLED_LICENSE );
@@ -279,7 +267,7 @@ final class WooCommerce_UCP {
 <?php
 /**
  * UCP discovery — served at /.well-known/ucp
- * Created by woocommerce-ucp plugin. Safe to delete if plugin is removed.
+ * Created by ucp-for-woocommerce plugin. Safe to delete if plugin is removed.
  */
 if ( ! file_exists( dirname( __FILE__, 2 ) . '/wp-load.php' ) ) { exit; }
 require_once dirname( __FILE__, 2 ) . '/wp-load.php';
@@ -299,7 +287,7 @@ PHP;
 <?php
 /**
  * OAuth 2.0 server metadata — served at /.well-known/oauth-authorization-server (RFC 8414)
- * Created by woocommerce-ucp plugin. Safe to delete if plugin is removed.
+ * Created by ucp-for-woocommerce plugin. Safe to delete if plugin is removed.
  */
 if ( ! file_exists( dirname( __FILE__, 2 ) . '/wp-load.php' ) ) { exit; }
 require_once dirname( __FILE__, 2 ) . '/wp-load.php';
@@ -316,7 +304,7 @@ exit;
 PHP;
 
 		$htaccess = <<<'HTACCESS'
-# Managed by woocommerce-ucp plugin
+# Managed by ucp-for-woocommerce plugin
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule ^ucp/?$ ucp.php [L]
@@ -355,7 +343,7 @@ HTACCESS;
 		$htaccess = $dir . '/.htaccess';
 		if ( $wp_filesystem->exists( $htaccess ) ) {
 			$contents = (string) $wp_filesystem->get_contents( $htaccess );
-			if ( str_contains( $contents, 'woocommerce-ucp plugin' ) || str_contains( $contents, 'shopwalk-ai plugin' ) ) {
+			if ( str_contains( $contents, 'ucp-for-woocommerce plugin' ) || str_contains( $contents, 'shopwalk-ai plugin' ) ) {
 				$wp_filesystem->delete( $htaccess );
 			}
 		}

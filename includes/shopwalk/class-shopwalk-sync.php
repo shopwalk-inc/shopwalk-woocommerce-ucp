@@ -105,7 +105,7 @@ final class Shopwalk_Sync {
 		if ( function_exists( 'wc_get_logger' ) ) {
 			wc_get_logger()->info(
 				sprintf( 'Push sync complete: %d products queued and flushed (reason: %s)', $count, $reason ),
-				array( 'source' => 'woocommerce-ucp' )
+				array( 'source' => 'ucp-for-woocommerce' )
 			);
 		}
 	}
@@ -285,7 +285,7 @@ final class Shopwalk_Sync {
 				'headers' => array(
 					'Content-Type' => 'application/json',
 					'X-API-Key'    => Shopwalk_License::key(),
-					'User-Agent'   => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
+					'User-Agent'   => 'ucp-for-woocommerce-plugin/' . WOOCOMMERCE_UCP_VERSION,
 				),
 				'body'    => wp_json_encode(
 					array(
