@@ -416,9 +416,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 							<li><?php esc_html_e( 'Priority Support — phone + email support', 'woocommerce-ucp' ); ?></li>
 						</ul>
 						<p>
-							<a class="button button-primary"
-							   href="<?php echo esc_url( SHOPWALK_PARTNERS_URL . '/subscribe' ); ?>"
-							   target="_blank" rel="noopener noreferrer">
+							<a class="button button-primary" href="<?php echo esc_url( SHOPWALK_PARTNERS_URL . '/subscribe' ); ?>" target="_blank" rel="noopener noreferrer">
 								<?php esc_html_e( 'Upgrade to Pro →', 'woocommerce-ucp' ); ?>
 							</a>
 						</p>
