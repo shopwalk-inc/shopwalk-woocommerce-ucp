@@ -48,7 +48,7 @@ final class WooCommerce_UCP_Admin_Self_Test {
 	public function handle(): void {
 		check_ajax_referer( 'shopwalk_self_test', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'woocommerce-ucp' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 		wp_send_json_success(
 			array(

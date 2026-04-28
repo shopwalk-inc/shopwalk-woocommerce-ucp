@@ -1,4 +1,4 @@
-# Contributing to WooCommerce UCP
+# Contributing to UCP for WooCommerce
 
 Thank you for your interest in contributing. This document covers everything you need to submit a great pull request.
 
@@ -35,14 +35,14 @@ Open an issue first if you're unsure — saves everyone time.
 
 ```bash
 # Clone the repo
-git clone https://github.com/shopwalk-inc/woocommerce-ucp.git
-cd woocommerce-ucp
+git clone https://github.com/shopwalk-inc/ucp-for-woocommerce.git
+cd ucp-for-woocommerce
 
 # Install dev dependencies (phpcs, qit-cli)
 composer install
 
 # Symlink or copy to your local WP install
-ln -s $(pwd) /path/to/wp-content/plugins/woocommerce-ucp
+ln -s $(pwd) /path/to/wp-content/plugins/ucp-for-woocommerce
 ```
 
 ---
@@ -141,15 +141,15 @@ Before submitting a PR, verify:
 
 ## Translations
 
-Translation files go in `languages/woocommerce-ucp-{locale}.po`.
+Translation files go in `languages/ucp-for-woocommerce-{locale}.po`.
 
-The text domain is `woocommerce-ucp`. All user-facing strings must use `__()`, `_e()`, `esc_html__()`, or equivalent with this text domain.
+The text domain is `ucp-for-woocommerce`. All user-facing strings must use `__()`, `_e()`, `esc_html__()`, or equivalent with this text domain.
 
 ---
 
 ## Reporting Bugs
 
-Open a [GitHub Issue](https://github.com/shopwalk-inc/woocommerce-ucp/issues) using the Bug Report template.
+Open a [GitHub Issue](https://github.com/shopwalk-inc/ucp-for-woocommerce/issues) using the Bug Report template.
 
 Include:
 - WordPress version

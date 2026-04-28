@@ -1,6 +1,6 @@
 <?php
 /**
- * Uninstall WooCommerce UCP — Universal Commerce Protocol.
+ * Uninstall UCP for WooCommerce.
  *
  * Removes the plugin's local state cleanly:
  *  - All wp_ucp_* tables (oauth_clients, oauth_tokens, checkout_sessions,
@@ -69,7 +69,7 @@ if ( $wp_filesystem ) {
 	$htaccess = $well_known_dir . '/.htaccess';
 	if ( $wp_filesystem->exists( $htaccess ) ) {
 		$contents = (string) $wp_filesystem->get_contents( $htaccess );
-		if ( false !== strpos( $contents, 'woocommerce-ucp plugin' ) || false !== strpos( $contents, 'shopwalk-ai plugin' ) ) {
+		if ( false !== strpos( $contents, 'ucp-for-woocommerce plugin' ) || false !== strpos( $contents, 'shopwalk-ai plugin' ) ) {
 			$wp_filesystem->delete( $htaccess );
 		}
 	}

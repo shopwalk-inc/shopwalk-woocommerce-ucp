@@ -1,6 +1,6 @@
 <?php
 /**
- * PHPUnit bootstrap for the WooCommerce UCP plugin.
+ * PHPUnit bootstrap for the UCP for WooCommerce plugin.
  *
  * Defines ABSPATH so plugin files can be included, then pulls in Composer
  * autoload + Brain\Monkey (used by tests that need to stub WordPress core

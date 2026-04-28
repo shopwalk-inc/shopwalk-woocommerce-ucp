@@ -1,0 +1,45 @@
+name: WordPress.org Plugin Check
+
+# Runs the same automated checks the wordpress.org submission review
+# uses. Surfaces issues our local phpcs.xml deliberately relaxes (e.g.
+# 1-min cron interval, @unlink) so we have a story for them BEFORE a
+# WP.org reviewer flags them.
+#
+# Action source: https://github.com/WordPress/plugin-check-action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  plugin-check:
+    name: WP.org Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Plugin Check
+        uses: WordPress/plugin-check-action@v1
+        with:
+          # Plugin was renamed to "UCP for WooCommerce" / slug
+          # ucp-for-woocommerce in the WP.org trademark-compliance pass.
+          # Without this the action falls back to the checkout dir name
+          # (woocommerce-ucp = repo name) and fails every i18n_usage
+          # check ("Expected 'woocommerce-ucp' but got 'ucp-for-woocommerce'").
+          slug: ucp-for-woocommerce
+          # Match the categories WP.org actually gates on. The `general`
+          # category covers i18n_usage; the rest are the same buckets the
+          # WP.org reviewer enforces.
+          categories: 'general,plugin_repo,security,performance,accessibility'
+          # Mirror .distignore — these files don't ship to WP.org, so
+          # findings against them are noise. tests/ ships nothing; dotfiles
+          # and *.md files are repo housekeeping; build dir + vendor never
+          # exist in production.
+          exclude-directories: 'tests,vendor,node_modules,.github,.git'
+          exclude-files: '.gitignore,.distignore,.editorconfig,.phpcs.xml.dist,phpunit.xml,phpunit.xml.dist,composer.json,composer.lock,package.json,package-lock.json,RELEASE.md,CHANGELOG.md,CONTRIBUTING.md'
+          # Submission warnings still need a documented rationale (see
+          # RELEASE.md) so the reviewer has our story.
+          exclude-checks: ''
