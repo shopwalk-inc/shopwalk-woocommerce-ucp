@@ -1200,12 +1200,18 @@ JS;
 			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
 		}
 
+		$license_key = get_option( 'shopwalk_license_key', '' );
+		if ( ! $license_key ) {
+			wp_send_json_error( array( 'message' => 'No license key configured.' ) );
+		}
+
 		$resp = wp_remote_post(
-			'https://api.shopwalk.com/api/v1/public/ucp/probe',
+			SHOPWALK_API_BASE . '/plugin/probe',
 			array(
 				'timeout' => 15,
 				'headers' => array(
 					'Content-Type' => 'application/json',
+					'X-API-Key'    => $license_key,
 					'User-Agent'   => 'woocommerce-ucp-plugin/' . WOOCOMMERCE_UCP_VERSION,
 				),
 				'body'    => wp_json_encode( array( 'store_url' => home_url() ) ),
