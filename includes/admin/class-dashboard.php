@@ -1184,7 +1184,11 @@ JS;
 				'headers' => array(
 					'X-API-Key' => $license_key,
 				),
-				'timeout' => 5,
+				// /plugin/status currently takes ~6s due to product+embedding
+				// JOIN counts. Anything below ~10s here surfaces as a Sync
+				// section "couldn't reach API" error even when the call is
+				// landing fine on the api side.
+				'timeout' => 15,
 			)
 		);
 
