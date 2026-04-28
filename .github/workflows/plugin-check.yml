@@ -24,9 +24,10 @@ jobs:
       - name: Run Plugin Check
         uses: WordPress/plugin-check-action@v1
         with:
-          # Match the categories WP.org actually gates on. We omit
-          # `late_escaping` for now (advisory; not a submission blocker).
-          checks: 'plugin_repo,security,performance,i18n,accessibility'
+          # Match the categories WP.org actually gates on. The `general`
+          # category covers i18n_usage; the rest are the same buckets the
+          # WP.org reviewer enforces.
+          categories: 'general,plugin_repo,security,performance,accessibility'
           # Errors fail the job; warnings stay visible but don't block.
           # Submission warnings still need a documented rationale (see
           # RELEASE.md) so the reviewer has our story.
