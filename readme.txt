@@ -6,7 +6,7 @@ Tested up to: 6.9
 Requires PHP: 8.1
 WC requires at least: 8.0
 WC tested up to: 9.8
-Stable tag: 3.0.56
+Stable tag: 3.1.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,9 @@ Shopwalk Privacy Policy: https://shopwalk.com/privacy
 4. Optional Shopwalk connect flow. Enter a free Shopwalk license to enable real-time push sync, brand voice, and Premier listing on shopwalk.com.
 
 == Changelog ==
+
+= 3.1.0 =
+* Expose per-variation data on `GET /wp-json/ucp/v1/products`. Variable products now carry a `variations[]` array with `variation_id`, `sku`, `price`, `regular_price`, `sale_price`, `stock_status`, `stock_quantity`, and a normalized `attributes` map (e.g. `color: "red"`, `size: "L"`). The `variation_id` is the WC variation post_id that the checkout endpoint expects in `DirectCheckoutItem.variant_id`. Simple/grouped/external products and variable products with no children are unchanged on the wire — the `variations` key is omitted entirely, not emitted as `[]`. This unblocks downstream variant ingestion in shopwalk-sync → Scylla and end-to-end variant ordering.
 
 = 3.0.47 =
 * Add a "Pause discovery" toggle to the connected-state Shopwalk panel in WP Admin. Merchants can hide their store and products from AI search / shopping / store pages without disconnecting the plugin or losing their license binding. POSTs to the new `/api/v1/plugin/discovery/{disable,enable}` endpoints; mirrors the API state to a local `shopwalk_discovery_paused` option so the toggle reflects current state without a round-trip on every render. Existing orders are unaffected; sync pauses while discovery is paused.

@@ -5,6 +5,11 @@
  * Returns paginated product data for the Shopwalk sync pipeline.
  * This is the endpoint shopwalk-api calls to fetch products during sync.
  *
+ * Variable products carry a `variations[]` array so downstream consumers
+ * (shopwalk-sync → Scylla) can ingest per-variant SKU/price/stock and the
+ * checkout endpoint can resolve `variant_id` → WC variation post_id.
+ * Non-variable products omit the `variations` key entirely.
+ *
  * @package WooCommerceUCP
  */
 
@@ -102,6 +107,31 @@ final class UCP_Products {
 				$data['brand'] = $brand;
 			}
 
+			/*
+			 * Variable products — emit one entry per variation.
+			 *
+			 * Performance choice: full detail inline (SKU, price, stock,
+			 * attributes), not a separate endpoint. Rationale:
+			 *   - The `/products` listing is paginated (default 100, max 250)
+			 *     and is called once per page during a sync run, not per
+			 *     request. shopwalk-sync would otherwise have to make N+1
+			 *     calls to a `/products/:id/variations` route, which is
+			 *     strictly worse for both wall-clock and HTTP overhead.
+			 *   - `WC_Product_Variable::get_children()` + per-child
+			 *     `wc_get_product()` is the same N queries either way.
+			 *   - Sites with thousands of variations per product can lower
+			 *     `per_page` to amortize; this matches existing pagination
+			 *     guidance for the catalog sync.
+			 * Non-variable products skip this branch entirely so the response
+			 * shape is unchanged for the simple-product 99% case.
+			 */
+			if ( $product instanceof WC_Product_Variable ) {
+				$variations = self::extract_variations( $product );
+				if ( ! empty( $variations ) ) {
+					$data['variations'] = $variations;
+				}
+			}
+
 			$products[] = $data;
 		}
 
@@ -120,5 +150,95 @@ final class UCP_Products {
 		$response->header( 'X-WP-TotalPages', (string) $query->max_num_pages );
 
 		return $response;
+	}
+
+	/**
+	 * Extract the variations array for a variable WC product.
+	 *
+	 * Pulled out as a static helper so it can be unit-tested without a full
+	 * WP/WC bootstrap (the test suite uses Brain\Monkey for WP function
+	 * stubs and stdClass-based product doubles).
+	 *
+	 * Each entry shape:
+	 *   variation_id   int         WC variation post_id (the int passed to
+	 *                              DirectCheckoutItem.VariantID at checkout)
+	 *   sku            string      may be empty if merchant left it blank
+	 *   price          float|null  current price (sale or regular); null if unset
+	 *   regular_price  float|null
+	 *   sale_price     float|null  null if not on sale
+	 *   stock_status   string      'instock' | 'outofstock' | 'onbackorder'
+	 *   stock_quantity int|null    null if managed at parent or unlimited
+	 *   attributes     array<string,string>  normalized name → value
+	 *                                         ('attribute_pa_color' => 'red'
+	 *                                         becomes 'color' => 'red')
+	 *
+	 * Returns an empty array for a variable product with no children defined,
+	 * which the caller treats as "omit the variations key entirely" — so
+	 * an empty variable product looks identical to a simple one on the wire.
+	 *
+	 * @param WC_Product_Variable $product Variable product to extract from.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function extract_variations( $product ): array {
+		$child_ids = $product->get_children();
+		if ( empty( $child_ids ) ) {
+			return array();
+		}
+
+		$variations = array();
+		foreach ( $child_ids as $child_id ) {
+			$variation = wc_get_product( (int) $child_id );
+			if ( ! $variation || ! ( $variation instanceof WC_Product_Variation ) ) {
+				continue;
+			}
+
+			$sale_price    = $variation->get_sale_price();
+			$regular_price = $variation->get_regular_price();
+			$price         = $variation->get_price();
+
+			$variations[] = array(
+				'variation_id'   => (int) $variation->get_id(),
+				'sku'            => (string) $variation->get_sku(),
+				'price'          => '' === $price || null === $price ? null : (float) $price,
+				'regular_price'  => '' === $regular_price || null === $regular_price ? null : (float) $regular_price,
+				'sale_price'     => '' === $sale_price || null === $sale_price ? null : (float) $sale_price,
+				'stock_status'   => (string) $variation->get_stock_status(),
+				'stock_quantity' => $variation->get_stock_quantity(), // null if unmanaged.
+				'attributes'     => self::normalize_variation_attributes( $variation->get_variation_attributes() ),
+			);
+		}
+
+		return $variations;
+	}
+
+	/**
+	 * Normalize WC's `attribute_pa_color => "red"` style into bare
+	 * `color => "red"` pairs.
+	 *
+	 * WC encodes variation attributes with two prefixes:
+	 *   - `attribute_pa_<slug>` for global product attributes (taxonomies)
+	 *   - `attribute_<slug>` for local "custom product attributes"
+	 * Both prefixes are stripped; the value is left as-is (slug for
+	 * taxonomy-backed terms, free text for custom attributes).
+	 *
+	 * Empty values (when a variation matches "any value" of an attribute)
+	 * are preserved as empty strings — downstream consumers can decide
+	 * whether to treat them as wildcards.
+	 *
+	 * @param array<string,string> $raw From WC_Product_Variation::get_variation_attributes().
+	 * @return array<string,string>
+	 */
+	public static function normalize_variation_attributes( array $raw ): array {
+		$out = array();
+		foreach ( $raw as $key => $value ) {
+			$name = (string) $key;
+			if ( str_starts_with( $name, 'attribute_pa_' ) ) {
+				$name = substr( $name, strlen( 'attribute_pa_' ) );
+			} elseif ( str_starts_with( $name, 'attribute_' ) ) {
+				$name = substr( $name, strlen( 'attribute_' ) );
+			}
+			$out[ $name ] = (string) $value;
+		}
+		return $out;
 	}
 }

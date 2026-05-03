@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Version
 
 ---
 
+## [3.1.0] — 2026-05-01
+
+### Added
+- `GET /wp-json/ucp/v1/products` now includes a `variations[]` array on variable products, exposing per-variation `variation_id` (the WC variation post_id used as `DirectCheckoutItem.variant_id` at checkout), `sku`, `price`, `regular_price`, `sale_price`, `stock_status`, `stock_quantity`, and a normalized `attributes` map (`attribute_pa_color: "red"` → `color: "red"`). Non-variable products (and variable products with no children) omit the `variations` key entirely — the response shape is unchanged for them. Unblocks variant ingestion in shopwalk-sync → Scylla and end-to-end variant ordering.
+
+---
+
 ## [3.0.0] — 2026-04-09
 
 Complete rewrite as a UCP-compliant adapter. The plugin's primary identity is now "the UCP adapter for WooCommerce." Shopwalk integration is one of several optional features layered on top.
