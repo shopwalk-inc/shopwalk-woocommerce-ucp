@@ -43,7 +43,7 @@ final class UCP_Webhook_Subscriptions {
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( __CLASS__, 'create_subscription' ),
-				'permission_callback' => '__return_true',
+				'permission_callback' => array( 'UCP_OAuth_Server', 'permission_require_oauth' ),
 			)
 		);
 		register_rest_route(
@@ -53,12 +53,12 @@ final class UCP_Webhook_Subscriptions {
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( __CLASS__, 'get_subscription' ),
-					'permission_callback' => '__return_true',
+					'permission_callback' => array( 'UCP_OAuth_Server', 'permission_require_oauth' ),
 				),
 				array(
 					'methods'             => WP_REST_Server::DELETABLE,
 					'callback'            => array( __CLASS__, 'delete_subscription' ),
-					'permission_callback' => '__return_true',
+					'permission_callback' => array( 'UCP_OAuth_Server', 'permission_require_oauth' ),
 				),
 			)
 		);

@@ -451,6 +451,31 @@ final class UCP_OAuth_Server {
 	// ── Authentication helper for resource endpoints ────────────────────
 
 	/**
+	 * permission_callback shim that runs authenticate_request() and returns
+	 * `true` on success or the WP_Error on failure. Use this on every REST
+	 * route that requires OAuth Bearer auth so the WP REST permission
+	 * middleware (rest_authentication_errors filter, capability filters)
+	 * sees the route as protected. Without this, registering routes with
+	 * `'permission_callback' => '__return_true'` and enforcing auth inside
+	 * the handler bypasses the middleware and is a single forgotten check
+	 * away from a silently unauthenticated route.
+	 *
+	 * Handlers that need the (client_id, user_id, scopes) context still call
+	 * authenticate_request() themselves; the duplicate work is intentional
+	 * defense-in-depth.
+	 *
+	 * @param WP_REST_Request $request The incoming request.
+	 * @return bool|WP_Error
+	 */
+	public static function permission_require_oauth( WP_REST_Request $request ) {
+		$ctx = self::authenticate_request( $request );
+		if ( is_wp_error( $ctx ) ) {
+			return $ctx;
+		}
+		return true;
+	}
+
+	/**
 	 * Verify a Bearer access token and return the (client_id, user_id, scopes)
 	 * triple. Returns a WP_Error on failure suitable for direct return from
 	 * a resource handler.
