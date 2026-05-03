@@ -24,6 +24,7 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/../' );
 defined( 'UCP_REST_NAMESPACE' ) || define( 'UCP_REST_NAMESPACE', 'shopwalk-ucp-agent/v1' );
 
 require_once __DIR__ . '/stubs/wp_rest_stubs.php';
+require_once __DIR__ . '/stubs/oauth_wp_stubs.php';
 
 /**
  * @runTestsInSeparateProcesses
@@ -49,6 +50,7 @@ final class RestPermissionCallbackTest extends TestCase {
 			}
 		);
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+		ucp_oauth_install_wp_stubs();
 
 		// Provide UCP_Storage if it isn't already (avoid double-declare).
 		if ( ! class_exists( 'UCP_Storage' ) ) {

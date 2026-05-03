@@ -30,6 +30,7 @@ defined( 'UCP_REST_NAMESPACE' ) || define( 'UCP_REST_NAMESPACE', 'shopwalk-ucp-a
 defined( 'UCP_TABLE_PREFIX' ) || define( 'UCP_TABLE_PREFIX', 'ucp_' );
 
 require_once __DIR__ . '/stubs/wp_rest_stubs.php';
+require_once __DIR__ . '/stubs/oauth_wp_stubs.php';
 
 /**
  * @runTestsInSeparateProcesses
@@ -60,6 +61,7 @@ final class OauthRefreshRotationTest extends TestCase {
 			}
 		);
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+		ucp_oauth_install_wp_stubs();
 
 		// Provide UCP_Storage if it isn't already (avoid double-declare).
 		if ( ! class_exists( 'UCP_Storage' ) ) {
@@ -163,10 +165,17 @@ final class OauthRefreshRotationTest extends TestCase {
 		$this->assertSame( 'Bearer', $body['token_type'] );
 		$this->assertSame( 3600, $body['expires_in'] );
 
-		// Old refresh row is now revoked.
+		// Old refresh row is now revoked. Tokens are stored as HMAC-SHA256
+		// keyed by the per-install pepper post-F-C-3 (formerly bcrypt).
 		$old_row = null;
 		foreach ( $this->rows() as $row ) {
-			if ( password_verify( $old_refresh, (string) $row['token_hash'] ) ) {
+			$stored = (string) $row['token_hash'];
+			$matches_legacy = ( str_starts_with( $stored, '$2y$' ) || str_starts_with( $stored, '$2b$' ) ) && password_verify( $old_refresh, $stored );
+			$matches_hmac   = ! str_starts_with( $stored, '$2' ) && hash_equals(
+				$stored,
+				hash_hmac( 'sha256', $old_refresh, hex2bin( (string) $GLOBALS['ucp_test_options']['shopwalk_ucp_oauth_token_pepper'] ?? '' ) )
+			);
+			if ( $matches_legacy || $matches_hmac ) {
 				$old_row = $row;
 				break;
 			}
@@ -354,6 +363,48 @@ final class RefreshRotationWpdb { // phpcs:ignore Generic.Files.OneObjectStructu
 	}
 
 	public function get_row( string $query, $output = ARRAY_A ) {
+		// Indexed live lookup (F-C-3): WHERE token_hash = %s AND token_type = %s AND revoked_at IS NULL AND expires_at > %s LIMIT 1
+		if ( preg_match( '/FROM\s+(\S+)\s+WHERE\s+token_hash\s*=\s*%s\s+AND\s+token_type\s*=\s*%s\s+AND\s+revoked_at\s+IS\s+NULL\s+AND\s+expires_at/i', $query, $m ) ) {
+			$table = $m[1];
+			$hash  = (string) ( $this->last_args[0] ?? '' );
+			$type  = (string) ( $this->last_args[1] ?? '' );
+			$now   = (string) ( $this->last_args[2] ?? gmdate( 'Y-m-d H:i:s' ) );
+			foreach ( $this->tables[ $table ] ?? array() as $row ) {
+				if ( ( $row['token_hash'] ?? '' ) !== $hash ) {
+					continue;
+				}
+				if ( ( $row['token_type'] ?? '' ) !== $type ) {
+					continue;
+				}
+				if ( null !== ( $row['revoked_at'] ?? null ) ) {
+					continue;
+				}
+				if ( ( $row['expires_at'] ?? '' ) <= $now ) {
+					continue;
+				}
+				return $row;
+			}
+			return null;
+		}
+		// Indexed revoked lookup: WHERE token_hash = %s AND token_type = %s AND revoked_at IS NOT NULL LIMIT 1
+		if ( preg_match( '/FROM\s+(\S+)\s+WHERE\s+token_hash\s*=\s*%s\s+AND\s+token_type\s*=\s*%s\s+AND\s+revoked_at\s+IS\s+NOT\s+NULL/i', $query, $m ) ) {
+			$table = $m[1];
+			$hash  = (string) ( $this->last_args[0] ?? '' );
+			$type  = (string) ( $this->last_args[1] ?? '' );
+			foreach ( $this->tables[ $table ] ?? array() as $row ) {
+				if ( ( $row['token_hash'] ?? '' ) !== $hash ) {
+					continue;
+				}
+				if ( ( $row['token_type'] ?? '' ) !== $type ) {
+					continue;
+				}
+				if ( null === ( $row['revoked_at'] ?? null ) ) {
+					continue;
+				}
+				return $row;
+			}
+			return null;
+		}
 		return null;
 	}
 
