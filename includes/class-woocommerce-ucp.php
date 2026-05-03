@@ -87,7 +87,9 @@ final class WooCommerce_UCP {
 		require_once $dir . 'class-ucp-direct-checkout.php';
 		require_once $dir . 'class-ucp-orders.php';
 
-		// Webhooks.
+		// Webhooks. URL guard is loaded first — both subscribe-time and
+		// delivery-time gate on it for SSRF defense.
+		require_once $dir . 'class-ucp-url-guard.php';
 		require_once $dir . 'class-ucp-webhook-subscriptions.php';
 		require_once $dir . 'class-ucp-webhook-delivery.php';
 

@@ -85,6 +85,14 @@ final class UCP_Webhook_Subscriptions {
 		if ( '' === $callback_url || ! filter_var( $callback_url, FILTER_VALIDATE_URL ) ) {
 			return UCP_Response::error( 'invalid_request', 'callback_url is required and must be a valid URL', 'recoverable', 400 );
 		}
+		// SSRF defense: reject non-https / userinfo / non-default-port /
+		// IP-literal hosts and any hostname that resolves into private,
+		// loopback, link-local, or cloud-metadata address space. See
+		// UCP_Url_Guard for the full classification.
+		$guard_err = UCP_Url_Guard::check_webhook_callback( $callback_url );
+		if ( null !== $guard_err ) {
+			return UCP_Response::error( 'invalid_request', $guard_err->get_error_message(), 'recoverable', 400 );
+		}
 		$event_types = array_values( array_intersect( $event_types, self::ALLOWED_EVENTS ) );
 		if ( count( $event_types ) === 0 ) {
 			return UCP_Response::error( 'invalid_request', 'At least one event_type from ' . implode( ',', self::ALLOWED_EVENTS ) . ' is required', 'recoverable', 400 );
