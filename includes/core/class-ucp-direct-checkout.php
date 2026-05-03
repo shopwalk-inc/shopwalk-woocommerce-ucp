@@ -267,7 +267,18 @@ final class UCP_Direct_Checkout {
 		$order->update_meta_data( '_shopwalk_source', 'direct_checkout' );
 		$order->update_meta_data( '_shopwalk_agent_id', sanitize_text_field( $body['shopwalk_agent_id'] ?? '' ) );
 		$order->update_meta_data( '_shopwalk_order_id', sanitize_text_field( $body['shopwalk_order_id'] ?? '' ) );
-		$order->update_meta_data( '_shopwalk_return_url', esc_url_raw( $body['return_url'] ?? '' ) );
+		// F-B-7: return_url is the post-payment redirect target. Only store
+		// it if it points at an allowlisted Shopwalk-owned host over https
+		// with no userinfo / non-443 port — otherwise the order completes
+		// fine but the redirect falls back to default WC behavior.
+		$return_url = (string) ( $body['return_url'] ?? '' );
+		if ( '' !== $return_url ) {
+			if ( self::is_allowed_return_url( $return_url ) ) {
+				$order->update_meta_data( '_shopwalk_return_url', esc_url_raw( $return_url ) );
+			} elseif ( function_exists( 'error_log' ) ) {
+				error_log( sprintf( '[shopwalk-ucp] Rejected return_url for order %d (host not in allowlist)', $order->get_id() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+		}
 		$order->update_meta_data( '_shopwalk_expires_at', gmdate( 'Y-m-d\TH:i:s\Z', time() + self::ORDER_TTL ) );
 
 		// ── Totals ──────────────────────────────────────────────────────
@@ -395,8 +406,11 @@ final class UCP_Direct_Checkout {
 			return $return_url;
 		}
 
-		$shopwalk_return = $order->get_meta( '_shopwalk_return_url' );
-		if ( '' !== $shopwalk_return ) {
+		$shopwalk_return = (string) $order->get_meta( '_shopwalk_return_url' );
+		// F-B-7: defense in depth — re-validate at filter time too, in case
+		// the meta was written before allowlisting was in place or via a
+		// path that bypasses create_order().
+		if ( '' !== $shopwalk_return && self::is_allowed_return_url( $shopwalk_return ) ) {
 			// Append order_id + status as query params for the Shopwalk UI.
 			$shopwalk_return = add_query_arg(
 				array(
@@ -409,6 +423,68 @@ final class UCP_Direct_Checkout {
 		}
 
 		return $return_url;
+	}
+
+	// ── Return URL Allowlist (F-B-7) ────────────────────────────────────────
+
+	/**
+	 * Is the given URL a safe post-payment redirect target?
+	 *
+	 * Restrictions:
+	 *   - Scheme MUST be https.
+	 *   - No userinfo (`user:pass@host`).
+	 *   - No port other than 443.
+	 *   - Host MUST be exact-match `myshopwalk.com`, exact-match
+	 *     `shopwalk.com`, or an immediate `*.shopwalk.com` subdomain.
+	 *     Override via `SHOPWALK_RETURN_URL_ALLOWED_HOSTS` constant
+	 *     (array of hostnames; exact-match only).
+	 *
+	 * Suffix-style attacks (`shopwalk.com.evil.com`) are rejected because
+	 * the matcher requires either exact host equality or `endswith('.shopwalk.com')`
+	 * — never `contains` or substring.
+	 *
+	 * @param string $url Candidate return URL.
+	 * @return bool
+	 */
+	private static function is_allowed_return_url( string $url ): bool {
+		if ( '' === $url ) {
+			return false;
+		}
+		$parts = function_exists( 'wp_parse_url' ) ? wp_parse_url( $url ) : parse_url( $url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+		if ( ! is_array( $parts ) ) {
+			return false;
+		}
+		// Scheme.
+		if ( ( $parts['scheme'] ?? '' ) !== 'https' ) {
+			return false;
+		}
+		// Userinfo.
+		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return false;
+		}
+		// Port — accept omitted or explicit 443.
+		if ( isset( $parts['port'] ) && 443 !== (int) $parts['port'] ) {
+			return false;
+		}
+		$host = strtolower( (string) ( $parts['host'] ?? '' ) );
+		if ( '' === $host ) {
+			return false;
+		}
+		// Default exact-match list.
+		$exact = array( 'myshopwalk.com', 'shopwalk.com' );
+		if ( defined( 'SHOPWALK_RETURN_URL_ALLOWED_HOSTS' ) && is_array( SHOPWALK_RETURN_URL_ALLOWED_HOSTS ) ) {
+			foreach ( SHOPWALK_RETURN_URL_ALLOWED_HOSTS as $h ) {
+				$exact[] = strtolower( (string) $h );
+			}
+		}
+		if ( in_array( $host, $exact, true ) ) {
+			return true;
+		}
+		// Subdomain wildcard: only `*.shopwalk.com` (NOT `*.myshopwalk.com`).
+		if ( str_ends_with( $host, '.shopwalk.com' ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	// ── Expired Order Cleanup ───────────────────────────────────────────────
