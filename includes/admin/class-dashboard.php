@@ -73,6 +73,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 						'sync_status'      => wp_create_nonce( 'shopwalk_sync_status' ),
 						'payments_status'  => wp_create_nonce( 'shopwalk_payments_status' ),
 					),
+					'i18n'    => $this->admin_i18n_strings(),
 				)
 			) . ';' . $this->admin_js()
 		);
@@ -290,7 +291,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 			<h2><?php esc_html_e( 'Sync', 'ucp-for-woocommerce' ); ?></h2>
 
 			<div id="sw-sync-info">
-				<p class="sw-muted">Loading sync status...</p>
+				<p class="sw-muted"><?php esc_html_e( 'Loading sync status...', 'ucp-for-woocommerce' ); ?></p>
 			</div>
 
 			<p>
@@ -330,11 +331,9 @@ final class WooCommerce_UCP_Admin_Dashboard {
 
 			<?php if ( 'unlicensed' === $tier ) : ?>
 				<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:20px;margin-bottom:16px;">
-					<p style="font-size:15px;font-weight:600;margin:0 0 8px;">Connect your store to Shopwalk</p>
+					<p style="font-size:15px;font-weight:600;margin:0 0 8px;"><?php esc_html_e( 'Connect your store to Shopwalk', 'ucp-for-woocommerce' ); ?></p>
 					<p class="sw-muted" style="margin:0 0 12px;">
-						Make your products discoverable by AI shopping agents. Shopwalk connects your WooCommerce store
-						to the AI commerce network — your products appear in search results across Claude, ChatGPT, and
-						other AI agents. 5% commission only on AI purchases made through Shopwalk.
+						<?php esc_html_e( 'Make your products discoverable by AI shopping agents. Shopwalk connects your WooCommerce store to the AI commerce network — your products appear in search results across Claude, ChatGPT, and other AI agents. 5% commission only on AI purchases made through Shopwalk.', 'ucp-for-woocommerce' ); ?>
 					</p>
 					<a href="<?php echo esc_url( Shopwalk_Connect::connect_url() ); ?>" class="button button-primary">
 						<?php esc_html_e( 'Connect to Shopwalk', 'ucp-for-woocommerce' ); ?>
@@ -468,11 +467,98 @@ final class WooCommerce_UCP_Admin_Dashboard {
 
 	// ── JS ──────────────────────────────────────────────────────────────────
 
+	/**
+	 * Returns the translatable strings used by the admin JS, keyed by the
+	 * identifier the JS reads from `swAdmin.i18n.<key>`. Centralised so the
+	 * JS heredoc remains literal-string-free for translators.
+	 */
+	private function admin_i18n_strings(): array {
+		return array(
+			'testing'                   => __( 'Testing…', 'ucp-for-woocommerce' ),
+			'connectingShopwalk'        => __( 'Connecting to Shopwalk servers…', 'ucp-for-woocommerce' ),
+			'testConnectivity'          => __( 'Test Connectivity', 'ucp-for-woocommerce' ),
+			'cannotReachApi'            => __( 'Cannot reach Shopwalk API', 'ucp-for-woocommerce' ),
+			'apiUnavailable'            => __( 'This means the Shopwalk platform is temporarily unavailable. Your store and products are not affected.', 'ucp-for-woocommerce' ),
+			'checkStatusOrRetry'        => __( 'Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again in a few minutes.', 'ucp-for-woocommerce' ),
+			'unknownError'              => __( 'unknown error', 'ucp-for-woocommerce' ),
+			'ucpEndpoints'              => __( 'UCP Endpoints', 'ucp-for-woocommerce' ),
+			'storeInfoLabel'            => __( 'Store Info — /ucp/store', 'ucp-for-woocommerce' ),
+			'productsLabel'             => __( 'Products — /ucp/products', 'ucp-for-woocommerce' ),
+			'discoveryLabel'            => __( 'Discovery — /.well-known/ucp', 'ucp-for-woocommerce' ),
+			'productsWord'              => __( 'products', 'ucp-for-woocommerce' ),
+			'inStock'                   => __( 'in stock', 'ucp-for-woocommerce' ),
+			'connectivityHeader'        => __( 'Connectivity', 'ucp-for-woocommerce' ),
+			'reachableFromShopwalk'     => __( 'Reachable from Shopwalk', 'ucp-for-woocommerce' ),
+			'unreachable'               => __( 'Unreachable', 'ucp-for-woocommerce' ),
+			'cannotReachStore'          => __( 'Shopwalk cannot reach your store.', 'ucp-for-woocommerce' ),
+			/* translators: %s: detected hosting provider name. */
+			'yourHostingProvider'       => __( 'Your hosting provider: %s', 'ucp-for-woocommerce' ),
+			'callHostAndAsk'            => __( 'Call your host and ask them to:', 'ucp-for-woocommerce' ),
+			'whitelistIp'               => __( '• Whitelist this IP address: <strong>15.204.101.254</strong>', 'ucp-for-woocommerce' ),
+			'whitelistUserAgent'        => __( '• Whitelist this User-Agent: <strong>Shopwalk-AI-Shopping</strong>', 'ucp-for-woocommerce' ),
+			'ensureRestNotBlocked'      => __( '• Ensure the REST API path <strong>/wp-json/ucp/v1/</strong> is not blocked by WAF or ModSecurity rules', 'ucp-for-woocommerce' ),
+			'whatToSayLabel'            => __( 'What to say:', 'ucp-for-woocommerce' ),
+			'whatToSayQuote'            => __( '"I have a WordPress plugin that uses the REST API. An external service at IP 15.204.101.254 needs to reach my site\'s /wp-json/ endpoints. Can you whitelist this IP and make sure no firewall or ModSecurity rule is blocking it?"', 'ucp-for-woocommerce' ),
+			'phoneLabel'                => __( 'Phone:', 'ucp-for-woocommerce' ),
+			'supportLabel'              => __( 'Support:', 'ucp-for-woocommerce' ),
+			'hostNotDetected'           => __( 'Your hosting provider could not be detected. Contact your host and ask them to:', 'ucp-for-woocommerce' ),
+			'whitelistIpShort'          => __( '• Whitelist IP: <strong>15.204.101.254</strong>', 'ucp-for-woocommerce' ),
+			'whitelistUaShort'          => __( '• Whitelist User-Agent: <strong>Shopwalk-AI-Shopping</strong>', 'ucp-for-woocommerce' ),
+			'ensureRestNotBlockedShort' => __( '• Ensure <strong>/wp-json/ucp/v1/</strong> is not blocked by firewall rules', 'ucp-for-woocommerce' ),
+			'hostingPrefix'             => __( 'Hosting:', 'ucp-for-woocommerce' ),
+			'networkError'              => __( 'Network error', 'ucp-for-woocommerce' ),
+			'networkErrorDesc'          => __( 'could not connect. Check your internet connection and try again.', 'ucp-for-woocommerce' ),
+			'localSelfTest'             => __( 'Local Self-Test', 'ucp-for-woocommerce' ),
+			'selfTestFailed'            => __( 'Self-test failed', 'ucp-for-woocommerce' ),
+			'serverIssuesDetected'      => __( 'Server issues detected', 'ucp-for-woocommerce' ),
+			'serverIssuesDesc'          => __( 'these require changes by your hosting provider.', 'ucp-for-woocommerce' ),
+			/* translators: %s: detected hosting provider name. */
+			'yourHostLabel'             => __( 'Your host: %s', 'ucp-for-woocommerce' ),
+			'contactToResolve'          => __( 'Contact them and ask to resolve:', 'ucp-for-woocommerce' ),
+			'contactHostingToResolve'   => __( 'Contact your hosting provider and ask them to resolve:', 'ucp-for-woocommerce' ),
+			'licenseKeyRequired'        => __( 'License key is required.', 'ucp-for-woocommerce' ),
+			'validating'                => __( 'Validating…', 'ucp-for-woocommerce' ),
+			'licenseActivated'          => __( 'License activated', 'ucp-for-woocommerce' ),
+			'activationFailed'          => __( 'Activation failed.', 'ucp-for-woocommerce' ),
+			'currentLicenseUnchanged'   => __( 'Your current license is unchanged.', 'ucp-for-woocommerce' ),
+			'checking'                  => __( 'Checking…', 'ucp-for-woocommerce' ),
+			'valid'                     => __( 'Valid', 'ucp-for-woocommerce' ),
+			'freePlan'                  => __( 'Free', 'ucp-for-woocommerce' ),
+			'planSuffix'                => __( 'plan', 'ucp-for-woocommerce' ),
+			'validationFailed'          => __( 'Validation failed', 'ucp-for-woocommerce' ),
+			'disconnectConfirm'         => __( 'Disconnect from Shopwalk? Your products will no longer be synced. UCP endpoints continue working independently.', 'ucp-for-woocommerce' ),
+			'disconnectFailed'          => __( 'Disconnect failed.', 'ucp-for-woocommerce' ),
+			'pauseDiscoveryConfirm'     => __( 'Pause AI discovery? Your store and products will be hidden from search, AI shopping, and store pages within ~2 minutes. Existing orders are unaffected.', 'ucp-for-woocommerce' ),
+			'resuming'                  => __( 'Resuming…', 'ucp-for-woocommerce' ),
+			'pausing'                   => __( 'Pausing…', 'ucp-for-woocommerce' ),
+			'discoveryResumed'          => __( 'Discovery resumed.', 'ucp-for-woocommerce' ),
+			'discoveryPaused'           => __( 'Discovery paused.', 'ucp-for-woocommerce' ),
+			'failed'                    => __( 'Failed.', 'ucp-for-woocommerce' ),
+			'checkStatusOrRetryLater'   => __( 'Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.', 'ucp-for-woocommerce' ),
+			'never'                     => __( 'Never', 'ucp-for-woocommerce' ),
+			'complete'                  => __( 'Complete', 'ucp-for-woocommerce' ),
+			'syncing'                   => __( 'Syncing', 'ucp-for-woocommerce' ),
+			'neverSynced'               => __( 'Never synced', 'ucp-for-woocommerce' ),
+			'wooCommerceLabel'          => __( 'WooCommerce', 'ucp-for-woocommerce' ),
+			'syncedLabel'               => __( 'Synced', 'ucp-for-woocommerce' ),
+			'statusLabel'               => __( 'Status', 'ucp-for-woocommerce' ),
+			'lastSyncedLabel'           => __( 'Last synced', 'ucp-for-woocommerce' ),
+			'couldNotLoadGateways'      => __( 'Could not load payment gateways.', 'ucp-for-woocommerce' ),
+			'noUcpAdaptersRegistered'   => __( 'No UCP payment adapters registered.', 'ucp-for-woocommerce' ),
+			'ready'                     => __( 'Ready', 'ucp-for-woocommerce' ),
+			'notConfigured'             => __( 'Not configured', 'ucp-for-woocommerce' ),
+			'manage'                    => __( 'Manage →', 'ucp-for-woocommerce' ),
+			'addKeys'                   => __( 'Add keys', 'ucp-for-woocommerce' ),
+			'configure'                 => __( 'Configure →', 'ucp-for-woocommerce' ),
+		);
+	}
+
 	private function admin_js(): string {
 		return <<<'JS'
 (function () {
 	var s = window.swAdmin;
 	if (!s) return;
+	var t = s.i18n || {};
 
 	function $(id) { return document.getElementById(id); }
 
@@ -492,18 +578,18 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		probeBtn.addEventListener('click', function () {
 			var out = $('sw-ucp-results');
 			probeBtn.disabled = true;
-			probeBtn.textContent = 'Testing…';
-			out.innerHTML = '<p class="sw-muted">Connecting to Shopwalk servers…</p>';
+			probeBtn.textContent = t.testing;
+			out.innerHTML = '<p class="sw-muted">' + t.connectingShopwalk + '</p>';
 
 			postAjax('shopwalk_probe', { nonce: s.nonces.probe }).then(function (resp) {
 				probeBtn.disabled = false;
-				probeBtn.textContent = 'Test Connectivity';
+				probeBtn.textContent = t.testConnectivity;
 				if (!resp || !resp.success) {
-					var errMsg = resp && resp.data && resp.data.message || 'unknown error';
+					var errMsg = resp && resp.data && resp.data.message || t.unknownError;
 					var html = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;">';
-					html += '<strong>Cannot reach Shopwalk API</strong> — ' + esc(errMsg) + '<br><br>';
-					html += 'This means the Shopwalk platform is temporarily unavailable. Your store and products are not affected.<br>';
-					html += 'Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again in a few minutes.';
+					html += '<strong>' + t.cannotReachApi + '</strong> — ' + esc(errMsg) + '<br><br>';
+					html += t.apiUnavailable + '<br>';
+					html += t.checkStatusOrRetry;
 					html += '</div>';
 					out.innerHTML = html;
 					return;
@@ -512,48 +598,48 @@ final class WooCommerce_UCP_Admin_Dashboard {
 				var html = '';
 
 				// Endpoints
-				html += '<strong>UCP Endpoints</strong>';
-				html += '<div class="sw-check-row"><span>' + (d.reachable ? '✅' : '❌') + ' Store Info — /ucp/store</span><span class="sw-muted">' + (d.latency_ms || '') + 'ms</span></div>';
-				html += '<div class="sw-check-row"><span>' + (d.products_ok ? '✅' : '❌') + ' Products — /ucp/products</span><span class="sw-muted">' + (d.products_issue || '') + '</span></div>';
-				html += '<div class="sw-check-row"><span>' + (d.discovery_ok ? '✅' : '❌') + ' Discovery — /.well-known/ucp</span><span class="sw-muted">' + (d.discovery_issue || '') + '</span></div>';
+				html += '<strong>' + t.ucpEndpoints + '</strong>';
+				html += '<div class="sw-check-row"><span>' + (d.reachable ? '✅' : '❌') + ' ' + t.storeInfoLabel + '</span><span class="sw-muted">' + (d.latency_ms || '') + 'ms</span></div>';
+				html += '<div class="sw-check-row"><span>' + (d.products_ok ? '✅' : '❌') + ' ' + t.productsLabel + '</span><span class="sw-muted">' + (d.products_issue || '') + '</span></div>';
+				html += '<div class="sw-check-row"><span>' + (d.discovery_ok ? '✅' : '❌') + ' ' + t.discoveryLabel + '</span><span class="sw-muted">' + (d.discovery_issue || '') + '</span></div>';
 
 				// Store info
 				if (d.product_count) {
-					html += '<p class="sw-muted">' + d.product_count + ' products · ' + (d.in_stock_count || 0) + ' in stock · ' + (d.currency || 'USD') + '</p>';
+					html += '<p class="sw-muted">' + d.product_count + ' ' + t.productsWord + ' · ' + (d.in_stock_count || 0) + ' ' + t.inStock + ' · ' + (d.currency || 'USD') + '</p>';
 				}
 
 				// Connectivity
-				html += '<br><strong>Connectivity</strong>';
+				html += '<br><strong>' + t.connectivityHeader + '</strong>';
 				if (d.reachable) {
-					html += '<div class="sw-check-row"><span>✅ Reachable from Shopwalk</span><span class="sw-muted">' + d.latency_ms + 'ms</span></div>';
+					html += '<div class="sw-check-row"><span>✅ ' + t.reachableFromShopwalk + '</span><span class="sw-muted">' + d.latency_ms + 'ms</span></div>';
 				} else {
-					html += '<div class="sw-check-row"><span>❌ ' + esc(d.reason || 'Unreachable') + '</span></div>';
+					html += '<div class="sw-check-row"><span>❌ ' + esc(d.reason || t.unreachable) + '</span></div>';
 					html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;">';
-					html += '<strong>Shopwalk cannot reach your store.</strong><br><br>';
+					html += '<strong>' + t.cannotReachStore + '</strong><br><br>';
 
 					if (d.host_name) {
-						html += '<strong>Your hosting provider: ' + esc(d.host_name) + '</strong><br><br>';
-						html += 'Call your host and ask them to:<br>';
-						html += '• Whitelist this IP address: <strong>15.204.101.254</strong><br>';
-						html += '• Whitelist this User-Agent: <strong>Shopwalk-AI-Shopping</strong><br>';
-						html += '• Ensure the REST API path <strong>/wp-json/ucp/v1/</strong> is not blocked by WAF or ModSecurity rules<br><br>';
-						html += '<strong>What to say:</strong> "I have a WordPress plugin that uses the REST API. An external service at IP 15.204.101.254 needs to reach my site\'s /wp-json/ endpoints. Can you whitelist this IP and make sure no firewall or ModSecurity rule is blocking it?"<br><br>';
+						html += '<strong>' + t.yourHostingProvider.replace('%s', esc(d.host_name)) + '</strong><br><br>';
+						html += t.callHostAndAsk + '<br>';
+						html += t.whitelistIp + '<br>';
+						html += t.whitelistUserAgent + '<br>';
+						html += t.ensureRestNotBlocked + '<br><br>';
+						html += '<strong>' + t.whatToSayLabel + '</strong> ' + t.whatToSayQuote + '<br><br>';
 						if (d.host_phone) {
-							html += 'Phone: <strong>' + esc(d.host_phone) + '</strong><br>';
+							html += t.phoneLabel + ' <strong>' + esc(d.host_phone) + '</strong><br>';
 						}
 						if (d.host_support) {
-							html += 'Support: <strong>' + esc(d.host_support) + '</strong><br>';
+							html += t.supportLabel + ' <strong>' + esc(d.host_support) + '</strong><br>';
 						}
 					} else {
-						html += 'Your hosting provider could not be detected. Contact your host and ask them to:<br>';
-						html += '• Whitelist IP: <strong>15.204.101.254</strong><br>';
-						html += '• Whitelist User-Agent: <strong>Shopwalk-AI-Shopping</strong><br>';
-						html += '• Ensure <strong>/wp-json/ucp/v1/</strong> is not blocked by firewall rules<br>';
+						html += t.hostNotDetected + '<br>';
+						html += t.whitelistIpShort + '<br>';
+						html += t.whitelistUaShort + '<br>';
+						html += t.ensureRestNotBlockedShort + '<br>';
 					}
 					html += '</div>';
 				}
 				if (d.host_name) {
-					html += '<div class="sw-check-row"><span>Hosting: ' + esc(d.host_name) + '</span>';
+					html += '<div class="sw-check-row"><span>' + t.hostingPrefix + ' ' + esc(d.host_name) + '</span>';
 					if (d.host_phone) html += '<span class="sw-muted">' + esc(d.host_phone) + '</span>';
 					html += '</div>';
 				}
@@ -564,8 +650,8 @@ final class WooCommerce_UCP_Admin_Dashboard {
 				out.innerHTML = html;
 			}).catch(function () {
 				probeBtn.disabled = false;
-				probeBtn.textContent = 'Test Connectivity';
-				out.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Network error</strong> — could not connect. Check your internet connection and try again.</div>';
+				probeBtn.textContent = t.testConnectivity;
+				out.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>' + t.networkError + '</strong> — ' + t.networkErrorDesc + '</div>';
 			});
 		});
 	}
@@ -576,15 +662,15 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		selfTestBtn.addEventListener('click', function () {
 			var out = $('sw-ucp-results');
 			selfTestBtn.disabled = true;
-			selfTestBtn.textContent = 'Testing…';
+			selfTestBtn.textContent = t.testing;
 			postAjax('shopwalk_self_test', { nonce: s.nonces.self_test }).then(function (resp) {
 				selfTestBtn.disabled = false;
-				selfTestBtn.textContent = 'Local Self-Test';
+				selfTestBtn.textContent = t.localSelfTest;
 				if (!resp || !resp.success) {
-					out.innerHTML = '<p style="color:#991b1b;">Self-test failed</p>';
+					out.innerHTML = '<p style="color:#991b1b;">' + t.selfTestFailed + '</p>';
 					return;
 				}
-				var html = '<strong>Local Self-Test</strong>';
+				var html = '<strong>' + t.localSelfTest + '</strong>';
 				var hasFail = false;
 				var failMessages = [];
 				(resp.data.checks || []).forEach(function (c) {
@@ -599,17 +685,17 @@ final class WooCommerce_UCP_Admin_Dashboard {
 				if (hasFail) {
 					var h = resp.data.host || {};
 					html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;">';
-					html += '<strong>Server issues detected</strong> — these require changes by your hosting provider.<br><br>';
+					html += '<strong>' + t.serverIssuesDetected + '</strong> — ' + t.serverIssuesDesc + '<br><br>';
 					if (h.name) {
-						html += '<strong>Your host: ' + esc(h.name) + '</strong><br>';
-						html += 'Contact them and ask to resolve:<br>';
+						html += '<strong>' + t.yourHostLabel.replace('%s', esc(h.name)) + '</strong><br>';
+						html += t.contactToResolve + '<br>';
 						html += '<ul style="margin:4px 0 8px 16px;">';
 						failMessages.forEach(function (m) { html += '<li>' + esc(m) + '</li>'; });
 						html += '</ul>';
-						if (h.phone) html += 'Phone: <strong>' + esc(h.phone) + '</strong><br>';
-						if (h.support) html += 'Support: <strong>' + esc(h.support) + '</strong><br>';
+						if (h.phone) html += t.phoneLabel + ' <strong>' + esc(h.phone) + '</strong><br>';
+						if (h.support) html += t.supportLabel + ' <strong>' + esc(h.support) + '</strong><br>';
 					} else {
-						html += 'Contact your hosting provider and ask them to resolve:<br>';
+						html += t.contactHostingToResolve + '<br>';
 						html += '<ul style="margin:4px 0 0 16px;">';
 						failMessages.forEach(function (m) { html += '<li>' + esc(m) + '</li>'; });
 						html += '</ul>';
@@ -629,22 +715,22 @@ final class WooCommerce_UCP_Admin_Dashboard {
 			var input = $('sw-license-input');
 			var status = $('sw-activate-status');
 			if (!input || !input.value.trim()) {
-				status.innerHTML = '<span style="color:#991b1b;">License key is required.</span>';
+				status.innerHTML = '<span style="color:#991b1b;">' + t.licenseKeyRequired + '</span>';
 				return;
 			}
 			activateBtn.disabled = true;
-			status.innerHTML = '<span class="sw-muted">Validating…</span>';
+			status.innerHTML = '<span class="sw-muted">' + t.validating + '</span>';
 
 			postAjax('shopwalk_activate', { nonce: s.nonces.activate, license_key: input.value.trim() }).then(function (resp) {
 				activateBtn.disabled = false;
 				if (resp && resp.success) {
-					status.innerHTML = '<span style="color:#065f46;">✅ ' + esc(resp.data.message || 'License activated') + '</span>';
+					status.innerHTML = '<span style="color:#065f46;">✅ ' + esc(resp.data.message || t.licenseActivated) + '</span>';
 					setTimeout(function () { window.location.reload(); }, 1000);
 				} else {
 					var current = $('sw-license-display');
-					var msg = (resp && resp.data && resp.data.message) || 'Activation failed.';
+					var msg = (resp && resp.data && resp.data.message) || t.activationFailed;
 					if (current) {
-						msg += ' Your current license is unchanged.';
+						msg += ' ' + t.currentLicenseUnchanged;
 					}
 					status.innerHTML = '<span style="color:#991b1b;">❌ ' + esc(msg) + '</span>';
 				}
@@ -658,13 +744,13 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		testBtn.addEventListener('click', function () {
 			var result = $('sw-test-license-result');
 			testBtn.disabled = true;
-			result.textContent = 'Checking…';
+			result.textContent = t.checking;
 			postAjax('shopwalk_test_license', { nonce: s.nonces.test_license }).then(function (resp) {
 				testBtn.disabled = false;
 				if (resp && resp.success && resp.data.valid) {
-					result.innerHTML = '<span style="color:#065f46;">✅ Valid · ' + esc(resp.data.plan || 'Free') + ' plan</span>';
+					result.innerHTML = '<span style="color:#065f46;">✅ ' + t.valid + ' · ' + esc(resp.data.plan || t.freePlan) + ' ' + t.planSuffix + '</span>';
 				} else {
-					result.innerHTML = '<span style="color:#991b1b;">❌ ' + esc(resp && resp.data && resp.data.message || 'Validation failed') + '</span>';
+					result.innerHTML = '<span style="color:#991b1b;">❌ ' + esc(resp && resp.data && resp.data.message || t.validationFailed) + '</span>';
 				}
 			});
 		});
@@ -675,10 +761,10 @@ final class WooCommerce_UCP_Admin_Dashboard {
 	if (disconnectBtn) {
 		disconnectBtn.addEventListener('click', function (e) {
 			e.preventDefault();
-			if (!confirm('Disconnect from Shopwalk? Your products will no longer be synced. UCP endpoints continue working independently.')) return;
+			if (!confirm(t.disconnectConfirm)) return;
 			postAjax('shopwalk_disconnect', { nonce: s.nonces.disconnect }).then(function (resp) {
 				if (resp && resp.success) window.location.reload();
-				else alert((resp && resp.data && resp.data.message) || 'Disconnect failed.');
+				else alert((resp && resp.data && resp.data.message) || t.disconnectFailed);
 			});
 		});
 	}
@@ -690,19 +776,19 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		discoveryToggle.addEventListener('change', function () {
 			var enable = discoveryToggle.checked;
 			var prev = !enable;
-			if (!enable && !confirm('Pause AI discovery? Your store and products will be hidden from search, AI shopping, and store pages within ~2 minutes. Existing orders are unaffected.')) {
+			if (!enable && !confirm(t.pauseDiscoveryConfirm)) {
 				discoveryToggle.checked = true;
 				return;
 			}
 			discoveryToggle.disabled = true;
-			if (discoveryStatus) discoveryStatus.textContent = enable ? 'Resuming…' : 'Pausing…';
+			if (discoveryStatus) discoveryStatus.textContent = enable ? t.resuming : t.pausing;
 			postAjax('shopwalk_toggle_discovery', { nonce: s.nonces.toggle_discovery, enable: enable ? '1' : '0' }).then(function (resp) {
 				discoveryToggle.disabled = false;
 				if (resp && resp.success) {
-					if (discoveryStatus) discoveryStatus.textContent = enable ? 'Discovery resumed.' : 'Discovery paused.';
+					if (discoveryStatus) discoveryStatus.textContent = enable ? t.discoveryResumed : t.discoveryPaused;
 				} else {
 					discoveryToggle.checked = prev;
-					if (discoveryStatus) discoveryStatus.textContent = (resp && resp.data && resp.data.message) || 'Failed.';
+					if (discoveryStatus) discoveryStatus.textContent = (resp && resp.data && resp.data.message) || t.failed;
 				}
 			});
 		});
@@ -715,7 +801,7 @@ final class WooCommerce_UCP_Admin_Dashboard {
 		if (!syncInfo) return;
 		postAjax('shopwalk_sync_status', { nonce: s.nonces.sync_status }).then(function (resp) {
 			if (!resp || !resp.success) {
-				syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>Cannot reach Shopwalk API</strong><br>Check <a href="https://shopwalk.com/status" target="_blank">shopwalk.com/status</a> or try again later.</div>';
+				syncInfo.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;font-size:13px;"><strong>' + t.cannotReachApi + '</strong><br>' + t.checkStatusOrRetryLater + '</div>';
 				return;
 			}
 			var d = resp.data;
@@ -723,18 +809,18 @@ final class WooCommerce_UCP_Admin_Dashboard {
 			var synced = st.synced_count || 0;
 			var total = st.product_count || 0;
 			var status = st.status || 'never';
-			var lastSync = st.last_synced_at ? new Date(st.last_synced_at).toLocaleString() : 'Never';
+			var lastSync = st.last_synced_at ? new Date(st.last_synced_at).toLocaleString() : t.never;
 
-			var statusLabel = status === 'complete' ? 'Complete' : status === 'syncing' ? 'Syncing' : 'Never synced';
+			var statusLabel = status === 'complete' ? t.complete : status === 'syncing' ? t.syncing : t.neverSynced;
 
 			var html = '<div class="sw-stats">';
-			html += '<div class="sw-stat"><div class="sw-stat-value">' + (d.local_count || 0).toLocaleString() + '</div><div class="sw-stat-label">WooCommerce</div></div>';
-			html += '<div class="sw-stat"><div class="sw-stat-value">' + synced.toLocaleString() + '</div><div class="sw-stat-label">Synced</div></div>';
+			html += '<div class="sw-stat"><div class="sw-stat-value">' + (d.local_count || 0).toLocaleString() + '</div><div class="sw-stat-label">' + t.wooCommerceLabel + '</div></div>';
+			html += '<div class="sw-stat"><div class="sw-stat-value">' + synced.toLocaleString() + '</div><div class="sw-stat-label">' + t.syncedLabel + '</div></div>';
 			html += '</div>';
 
 			html += '<table class="sw-details">';
-			html += '<tr><td>Status</td><td>' + esc(statusLabel) + '</td></tr>';
-			html += '<tr><td>Last synced</td><td>' + esc(lastSync) + '</td></tr>';
+			html += '<tr><td>' + t.statusLabel + '</td><td>' + esc(statusLabel) + '</td></tr>';
+			html += '<tr><td>' + t.lastSyncedLabel + '</td><td>' + esc(lastSync) + '</td></tr>';
 			html += '</table>';
 
 			syncInfo.innerHTML = html;
@@ -748,28 +834,28 @@ final class WooCommerce_UCP_Admin_Dashboard {
 	if (paymentsEl) {
 		postAjax('shopwalk_payments_status', { nonce: s.nonces.payments_status }).then(function (resp) {
 			if (!resp || !resp.success) {
-				paymentsEl.innerHTML = '<p class="sw-muted">Could not load payment gateways.</p>';
+				paymentsEl.innerHTML = '<p class="sw-muted">' + t.couldNotLoadGateways + '</p>';
 				return;
 			}
 			var gateways = (resp.data && resp.data.gateways) || [];
 			if (!gateways.length) {
-				paymentsEl.innerHTML = '<p class="sw-muted">No UCP payment adapters registered.</p>';
+				paymentsEl.innerHTML = '<p class="sw-muted">' + t.noUcpAdaptersRegistered + '</p>';
 				return;
 			}
 			var html = '';
 			gateways.forEach(function (g) {
 				var icon = g.ready ? '✅' : '⬜';
-				var state = g.ready ? 'Ready' + (g.mode ? ' · ' + esc(g.mode) : '') : 'Not configured';
+				var state = g.ready ? t.ready + (g.mode ? ' · ' + esc(g.mode) : '') : t.notConfigured;
 				html += '<div class="sw-check-row">';
 				html += '<span>' + icon + ' ' + esc(g.label) + ' <span class="sw-muted">' + esc(state) + '</span></span>';
 				html += '<span>';
 				if (g.ready) {
-					html += '<a href="' + esc(g.settings_url) + '">Manage →</a>';
+					html += '<a href="' + esc(g.settings_url) + '">' + t.manage + '</a>';
 				} else if (g.install_url) {
-					html += '<a href="' + esc(g.settings_url) + '">Add keys</a> · ';
+					html += '<a href="' + esc(g.settings_url) + '">' + t.addKeys + '</a> · ';
 					html += '<a href="' + esc(g.install_url) + '">' + esc(g.install_label) + '</a>';
 				} else {
-					html += '<a href="' + esc(g.settings_url) + '">Configure →</a>';
+					html += '<a href="' + esc(g.settings_url) + '">' + t.configure + '</a>';
 				}
 				html += '</span>';
 				html += '</div>';
@@ -787,7 +873,7 @@ JS;
 	public function ajax_self_test(): void {
 		check_ajax_referer( 'shopwalk_self_test', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 		$checks = array();
 
@@ -1028,7 +1114,7 @@ JS;
 	public function ajax_payments_status(): void {
 		check_ajax_referer( 'shopwalk_payments_status', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		$adapters = class_exists( 'UCP_Payment_Router' ) ? UCP_Payment_Router::registry() : array();
@@ -1114,12 +1200,12 @@ JS;
 	public function ajax_sync_status(): void {
 		check_ajax_referer( 'shopwalk_sync_status', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		$license_key = get_option( 'shopwalk_license_key', '' );
 		if ( ! $license_key ) {
-			wp_send_json_error( array( 'message' => 'No license key configured.' ) );
+			wp_send_json_error( array( 'message' => __( 'No license key configured.', 'ucp-for-woocommerce' ) ) );
 		}
 
 		$api_url  = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
@@ -1142,7 +1228,12 @@ JS;
 			wp_send_json_error( array( 'message' => $response->get_error_message() ) );
 		}
 		if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			wp_send_json_error( array( 'message' => 'HTTP ' . wp_remote_retrieve_response_code( $response ) ) );
+			wp_send_json_error(
+				array(
+					/* translators: %d: HTTP status code returned by the Shopwalk API. */
+					'message' => sprintf( __( 'HTTP %d', 'ucp-for-woocommerce' ), wp_remote_retrieve_response_code( $response ) ),
+				)
+			);
 		}
 
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -1159,12 +1250,12 @@ JS;
 	public function ajax_probe(): void {
 		check_ajax_referer( 'shopwalk_probe', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		$license_key = get_option( 'shopwalk_license_key', '' );
 		if ( ! $license_key ) {
-			wp_send_json_error( array( 'message' => 'No license key configured.' ) );
+			wp_send_json_error( array( 'message' => __( 'No license key configured.', 'ucp-for-woocommerce' ) ) );
 		}
 
 		$resp = wp_remote_post(
@@ -1181,7 +1272,12 @@ JS;
 		);
 
 		if ( is_wp_error( $resp ) ) {
-			wp_send_json_error( array( 'message' => 'Could not reach Shopwalk API: ' . $resp->get_error_message() ) );
+			wp_send_json_error(
+				array(
+					/* translators: %s: error message returned by the WordPress HTTP transport. */
+					'message' => sprintf( __( 'Could not reach Shopwalk API: %s', 'ucp-for-woocommerce' ), $resp->get_error_message() ),
+				)
+			);
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $resp ), true );
@@ -1191,12 +1287,12 @@ JS;
 	public function ajax_activate(): void {
 		check_ajax_referer( 'shopwalk_activate', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		$new_key = isset( $_POST['license_key'] ) ? sanitize_text_field( wp_unslash( $_POST['license_key'] ) ) : '';
 		if ( ! $new_key ) {
-			wp_send_json_error( array( 'message' => 'License key is required.' ) );
+			wp_send_json_error( array( 'message' => __( 'License key is required.', 'ucp-for-woocommerce' ) ) );
 		}
 
 		// Validate the new key BEFORE replacing the old one
@@ -1210,26 +1306,29 @@ JS;
 			// next_billing_date / status to options itself; we just relay
 			// the user-facing message here.
 			$plan = $result['plan'] ?? '';
-			$msg  = '' !== $plan ? 'License activated. Plan: ' . ucfirst( $plan ) : 'License activated.';
+			$msg  = '' !== $plan
+				/* translators: %s: license plan name (e.g. Free, Pro). */
+				? sprintf( __( 'License activated. Plan: %s', 'ucp-for-woocommerce' ), ucfirst( $plan ) )
+				: __( 'License activated.', 'ucp-for-woocommerce' );
 			wp_send_json_success( array( 'message' => $msg ) );
 		} else {
-			wp_send_json_error( array( 'message' => $result['message'] ?? 'Activation failed.' ) );
+			wp_send_json_error( array( 'message' => $result['message'] ?? __( 'Activation failed.', 'ucp-for-woocommerce' ) ) );
 		}
 	}
 
 	public function ajax_test_license(): void {
 		check_ajax_referer( 'shopwalk_test_license', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		if ( ! class_exists( 'Shopwalk_License' ) ) {
-			wp_send_json_error( array( 'message' => 'License module not loaded.' ) );
+			wp_send_json_error( array( 'message' => __( 'License module not loaded.', 'ucp-for-woocommerce' ) ) );
 		}
 
 		$key = Shopwalk_License::key();
 		if ( ! $key ) {
-			wp_send_json_error( array( 'message' => 'No license key configured.' ) );
+			wp_send_json_error( array( 'message' => __( 'No license key configured.', 'ucp-for-woocommerce' ) ) );
 		}
 
 		$result = Shopwalk_License::activate( $key );
@@ -1242,7 +1341,7 @@ JS;
 			array(
 				'valid'   => $valid,
 				'plan'    => $plan,
-				'message' => $valid ? 'License is valid' : ( $result['message'] ?? 'Validation failed' ),
+				'message' => $valid ? __( 'License is valid', 'ucp-for-woocommerce' ) : ( $result['message'] ?? __( 'Validation failed', 'ucp-for-woocommerce' ) ),
 			)
 		);
 	}
@@ -1250,7 +1349,7 @@ JS;
 	public function ajax_disconnect(): void {
 		check_ajax_referer( 'shopwalk_disconnect', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 
 		if ( class_exists( 'Shopwalk_License' ) ) {
@@ -1264,7 +1363,7 @@ JS;
 		delete_option( 'shopwalk_sync_state' );
 		delete_option( 'shopwalk_sync_history' );
 
-		wp_send_json_success( array( 'message' => 'Disconnected from Shopwalk.' ) );
+		wp_send_json_success( array( 'message' => __( 'Disconnected from Shopwalk.', 'ucp-for-woocommerce' ) ) );
 	}
 
 	/**
@@ -1275,10 +1374,10 @@ JS;
 	public function ajax_toggle_discovery(): void {
 		check_ajax_referer( 'shopwalk_toggle_discovery', 'nonce' );
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Insufficient permissions.' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ucp-for-woocommerce' ) ), 403 );
 		}
 		if ( ! class_exists( 'Shopwalk_License' ) ) {
-			wp_send_json_error( array( 'message' => 'Shopwalk not connected.' ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Shopwalk not connected.', 'ucp-for-woocommerce' ) ), 400 );
 		}
 		$enable = isset( $_POST['enable'] ) && '1' === $_POST['enable'];
 		$ok     = $enable ? Shopwalk_License::resume_discovery() : Shopwalk_License::pause_discovery();
