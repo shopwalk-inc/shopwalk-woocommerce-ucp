@@ -126,9 +126,11 @@ final class WooCommerce_UCP {
 		require_once $dir . 'class-shopwalk-sync.php';
 		require_once $dir . 'class-shopwalk-connector.php';
 		require_once $dir . 'class-shopwalk-dashboard-panel.php';
+		require_once $dir . 'class-shopwalk-direct-checkout-notifier.php';
 
 		Shopwalk_Sync::instance();
 		Shopwalk_Connector::instance();
+		Shopwalk_Direct_Checkout_Notifier::instance();
 
 		// Auto-activate prefilled license if pending (set during plugin activation
 		// hook when Shopwalk_License wasn't loaded yet).

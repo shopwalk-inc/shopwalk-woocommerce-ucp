@@ -310,11 +310,25 @@ final class UCP_Direct_Checkout {
 		);
 	}
 
-	// ── Order Status Webhook ────────────────────────────────────────────────
+	// ── Order Status Hook (Tier-1 generic emit) ─────────────────────────────
 
 	/**
-	 * Fires when a WooCommerce order changes status. If the order originated
-	 * from Shopwalk Direct Checkout, POST a webhook to shopwalk-api.
+	 * Fires when a WooCommerce order changes status. Tier 1 owns nothing
+	 * about how listeners notify their own backends — it just emits a generic
+	 * action with the order data subscribers need.
+	 *
+	 * Tier 2 (Shopwalk integration) subscribes to this action via
+	 * `Shopwalk_Direct_Checkout_Notifier` in includes/shopwalk/. Removing the
+	 * shopwalk/ directory leaves Tier 1 functional with zero outbound HTTP.
+	 *
+	 * The action signature `(WC_Order $order, int $order_id, string $old_status,
+	 * string $new_status, string $external_order_id)` is the contract — keep
+	 * it stable.
+	 *
+	 * Note: `$external_order_id` is read from the order meta key
+	 * `_shopwalk_order_id` for data-continuity reasons, but it represents the
+	 * agent-side external_order_id any UCP-compliant agent would store. The
+	 * meta key name is preserved deliberately; renaming is a separate cleanup.
 	 *
 	 * @param int      $order_id   WC order ID.
 	 * @param string   $from       Previous status (without wc- prefix).
@@ -323,70 +337,38 @@ final class UCP_Direct_Checkout {
 	 * @return void
 	 */
 	public static function on_order_status_changed( int $order_id, string $from, string $to, $order ): void {
-		$shopwalk_order_id = $order->get_meta( '_shopwalk_order_id' );
-		$shopwalk_source   = $order->get_meta( '_shopwalk_source' );
-
-		// Only fire for Shopwalk-originated orders.
-		if ( 'direct_checkout' !== $shopwalk_source || '' === $shopwalk_order_id ) {
+		if ( ! $order || ! is_object( $order ) || ! method_exists( $order, 'get_meta' ) ) {
 			return;
 		}
 
-		$license_key = get_option( 'shopwalk_license_key', '' );
-		if ( '' === $license_key ) {
+		$external_order_id = (string) $order->get_meta( '_shopwalk_order_id' );
+		$source            = (string) $order->get_meta( '_shopwalk_source' );
+
+		// Only emit for Direct Checkout-originated orders. Tier 1 owns the
+		// "is this our order?" guard because the meta keys are written by
+		// create_order() in this same class.
+		if ( 'direct_checkout' !== $source || '' === $external_order_id ) {
 			return;
 		}
 
-		$api_url = defined( 'SHOPWALK_API_URL' ) ? SHOPWALK_API_URL : 'https://api.shopwalk.com';
-
-		// Attempt to get tracking info from common tracking plugins.
-		$tracking_number = '';
-		$carrier         = '';
-
-		// Support WooCommerce Shipment Tracking plugin.
-		$tracking_items = $order->get_meta( '_wc_shipment_tracking_items' );
-		if ( is_array( $tracking_items ) && ! empty( $tracking_items ) ) {
-			$last            = end( $tracking_items );
-			$tracking_number = $last['tracking_number'] ?? '';
-			$carrier         = $last['tracking_provider'] ?? '';
-		}
-
-		$payload = array(
-			'event'             => 'order.status_changed',
-			'order_id'          => $order_id,
-			'shopwalk_order_id' => $shopwalk_order_id,
-			'from_status'       => $from,
-			'to_status'         => $to,
-			'total'             => self::to_cents( (float) $order->get_total() ),
-			'currency'          => $order->get_currency(),
-			'tracking_number'   => $tracking_number,
-			'carrier'           => $carrier,
-		);
-
-		$body       = wp_json_encode( $payload );
-		$timestamp  = time();
-		$webhook_id = 'evt_' . wp_generate_uuid4();
-		$digest     = base64_encode( hash( 'sha256', $body, true ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Required for Content-Digest header per RFC 9530.
-
-		// HMAC signature over the signed content using the license key.
-		$signed_content = $webhook_id . '.' . $timestamp . '.' . $body;
-		$signature      = base64_encode( hash_hmac( 'sha256', $signed_content, $license_key, true ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Required for HMAC-SHA256 webhook signature.
-
-		wp_remote_post(
-			$api_url . '/api/v1/ucp/webhooks/orders',
-			array(
-				'timeout' => 15,
-				'headers' => array(
-					'Content-Type'      => 'application/json',
-					'X-License-Key'     => $license_key,
-					'Webhook-Timestamp' => strval( $timestamp ),
-					'Webhook-Id'        => $webhook_id,
-					'UCP-Agent'         => 'profile="' . get_site_url() . '/.well-known/ucp"',
-					'Content-Digest'    => 'sha-256=:' . $digest . ':',
-					'Signature-Input'   => 'sig1=("content-digest" "webhook-id" "webhook-timestamp");keyid="store-hmac";alg="hmac-sha256"',
-					'Signature'         => 'sig1=:' . $signature . ':',
-				),
-				'body'    => $body,
-			)
+		/**
+		 * Notify any listeners (Tier 2 Shopwalk integration subscribes via
+		 * includes/shopwalk/class-shopwalk-direct-checkout-notifier.php). Tier 1
+		 * owns nothing about how subscribers notify their backends.
+		 *
+		 * @param WC_Order $order             The order object.
+		 * @param int      $order_id          WC order ID.
+		 * @param string   $from              Previous WC status (without wc- prefix).
+		 * @param string   $to                New WC status (without wc- prefix).
+		 * @param string   $external_order_id The agent-side order id stored on the order.
+		 */
+		do_action(
+			'ucp_direct_checkout_order_status_changed',
+			$order,
+			$order_id,
+			$from,
+			$to,
+			$external_order_id
 		);
 	}
 
