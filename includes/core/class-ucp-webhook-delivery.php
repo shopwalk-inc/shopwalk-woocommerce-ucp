@@ -294,11 +294,26 @@ final class UCP_Webhook_Delivery {
 		$signed_content = $webhook_id . '.' . $timestamp . '.' . $payload;
 		$signature      = base64_encode( hash_hmac( 'sha256', $signed_content, $secret, true ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Required for HMAC-SHA256 webhook signature.
 
+		// TOCTOU defense: DNS for the callback host may have flipped between
+		// subscribe and delivery (intentional rebinding attack, or just a
+		// CNAME swap). Re-validate against the current resolution before
+		// every POST.
+		$guard_err = UCP_Url_Guard::check_webhook_callback( (string) $sub['callback_url'] );
+		if ( null !== $guard_err ) {
+			self::record_failure( (int) $row['id'], (int) $row['attempts'] + 1, $guard_err->get_error_message() );
+			return;
+		}
+
 		$response = wp_remote_post(
 			(string) $sub['callback_url'],
 			array(
-				'timeout' => 15,
-				'headers' => array(
+				'timeout'     => 15,
+				// SSRF defense: never follow redirects. WP HTTP defaults to
+				// 5 follow-throughs, which would let a strict subscribe-time
+				// check be bypassed by an https URL that 302s to
+				// http://169.254.169.254/.
+				'redirection' => 0,
+				'headers'     => array(
 					'Content-Type'      => 'application/json',
 					'Webhook-Timestamp' => strval( $timestamp ),
 					'Webhook-Id'        => $webhook_id,
@@ -307,7 +322,7 @@ final class UCP_Webhook_Delivery {
 					'Signature-Input'   => 'sig1=("content-digest" "webhook-id" "webhook-timestamp");keyid="store-hmac";alg="hmac-sha256"',
 					'Signature'         => 'sig1=:' . $signature . ':',
 				),
-				'body'    => $payload,
+				'body'        => $payload,
 			)
 		);
 
