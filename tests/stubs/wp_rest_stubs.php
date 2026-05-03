@@ -31,6 +31,14 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 			return $this->params[ $name ] ?? null;
 		}
 
+		public function get_query_params(): array {
+			return $this->params;
+		}
+
+		public function get_params(): array {
+			return $this->params;
+		}
+
 		public function set_json_params( array $body ): void {
 			$this->json = $body;
 		}
@@ -49,10 +57,13 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response { // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 		public $data;
 		public int $status;
+		/** @var array<string,string> */
+		public array $headers;
 
-		public function __construct( $data = null, int $status = 200 ) {
-			$this->data   = $data;
-			$this->status = $status;
+		public function __construct( $data = null, int $status = 200, array $headers = array() ) {
+			$this->data    = $data;
+			$this->status  = $status;
+			$this->headers = $headers;
 		}
 
 		public function get_data() {
@@ -61,6 +72,10 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
 		public function get_status(): int {
 			return $this->status;
+		}
+
+		public function get_headers(): array {
+			return $this->headers;
 		}
 	}
 }

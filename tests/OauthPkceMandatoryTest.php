@@ -33,6 +33,7 @@ defined( 'UCP_REST_NAMESPACE' ) || define( 'UCP_REST_NAMESPACE', 'shopwalk-ucp-a
 defined( 'UCP_TABLE_PREFIX' ) || define( 'UCP_TABLE_PREFIX', 'ucp_' );
 
 require_once __DIR__ . '/stubs/wp_rest_stubs.php';
+require_once __DIR__ . '/stubs/oauth_wp_stubs.php';
 
 /**
  * @runTestsInSeparateProcesses
@@ -64,11 +65,7 @@ final class OauthPkceMandatoryTest extends TestCase {
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 		Functions\when( 'get_current_user_id' )->justReturn( self::USER_ID );
 		Functions\when( 'wp_login_url' )->returnArg();
-		Functions\when( 'rest_url' )->alias(
-			static function ( $path = '' ) {
-				return 'https://shop.example/wp-json/' . ltrim( (string) $path, '/' );
-			}
-		);
+		ucp_oauth_install_wp_stubs();
 
 		if ( ! class_exists( 'UCP_Storage' ) ) {
 			eval( 'class UCP_Storage { public static function table( string $short ): string { return "wp_ucp_" . $short; } }' );
@@ -101,6 +98,7 @@ final class OauthPkceMandatoryTest extends TestCase {
 		\UCP_OAuth_Clients::$expected_redirect_uri  = self::REDIRECT_URI;
 
 		require_once __DIR__ . '/../includes/core/class-ucp-oauth-server.php';
+		\UCP_OAuth_Server::$testing_no_exit = true;
 	}
 
 	protected function tearDown(): void {
@@ -139,8 +137,12 @@ final class OauthPkceMandatoryTest extends TestCase {
 	}
 
 	/**
-	 * Drive the /authorize endpoint with a valid S256 challenge and pull
-	 * the freshly-minted authorization code out of the redirect Location.
+	 * Drive /authorize → render consent page → POST /consent → pull the
+	 * freshly-minted authorization code out of the redirect Location.
+	 *
+	 * Post-F-C-6: /authorize never silently mints a code. It renders an
+	 * HTML consent page with Approve/Deny buttons. The code is issued by
+	 * /consent after the user clicks Approve and the wp_nonce check passes.
 	 */
 	private function authorize_and_get_code( string $verifier, ?string $explicit_method = 'S256' ): string {
 		$challenge = self::compute_s256( $verifier );
@@ -149,15 +151,57 @@ final class OauthPkceMandatoryTest extends TestCase {
 			$params['code_challenge_method'] = $explicit_method;
 		}
 		$resp = UCP_OAuth_Server::handle_authorize( $this->authorize_request( $params ) );
-		$this->assertInstanceOf( WP_REST_Response::class, $resp, 'authorize must succeed for valid S256 PKCE' );
-		$this->assertSame( 302, $resp->get_status() );
-		$body = $resp->get_data();
+		$this->assertInstanceOf( WP_REST_Response::class, $resp, 'authorize must render consent page for valid S256 PKCE' );
+		$this->assertSame( 200, $resp->get_status() );
+
+		// Consent page hands a wp_nonce to the form; in the test stub the
+		// nonce is recorded into $GLOBALS['ucp_test_nonces'] keyed by action.
+		$nonce_value = '';
+		foreach ( $GLOBALS['ucp_test_nonces'] ?? array() as $val => $action ) {
+			if ( 'ucp_oauth_consent_' . self::CLIENT_ID === $action ) {
+				$nonce_value = (string) $val;
+				break;
+			}
+		}
+		$this->assertNotSame( '', $nonce_value, 'consent page must issue a nonce' );
+
+		$method = $explicit_method ?? 'S256';
+		$consent_resp = UCP_OAuth_Server::handle_consent(
+			$this->consent_request(
+				array(
+					'_wpnonce'              => $nonce_value,
+					'decision'              => 'approve',
+					'code_challenge'        => $challenge,
+					'code_challenge_method' => $method,
+				)
+			)
+		);
+		$this->assertInstanceOf( WP_REST_Response::class, $consent_resp, 'consent must 302 on approve' );
+		$this->assertSame( 302, $consent_resp->get_status() );
+		$body = $consent_resp->get_data();
 		$this->assertArrayHasKey( 'redirect_to', $body );
 		$qs = parse_url( $body['redirect_to'], PHP_URL_QUERY );
 		$this->assertIsString( $qs );
 		parse_str( $qs, $parts );
 		$this->assertArrayHasKey( 'code', $parts );
 		return (string) $parts['code'];
+	}
+
+	/**
+	 * Build a /consent POST request with the same baseline params /authorize
+	 * was called with, plus whatever the caller wants to override.
+	 */
+	private function consent_request( array $extra = array() ): WP_REST_Request {
+		$req = new WP_REST_Request();
+		$req->set_param( 'client_id', self::CLIENT_ID );
+		$req->set_param( 'redirect_uri', self::REDIRECT_URI );
+		$req->set_param( 'state', 'xyz' );
+		$req->set_param( 'response_type', 'code' );
+		$req->set_param( 'scope', 'ucp:checkout ucp:orders' );
+		foreach ( $extra as $k => $v ) {
+			$req->set_param( $k, $v );
+		}
+		return $req;
 	}
 
 	// ── /authorize — PKCE enforcement ────────────────────────────────────
@@ -361,6 +405,48 @@ final class PkceMandatoryWpdb { // phpcs:ignore Generic.Files.OneObjectStructure
 	}
 
 	public function get_row( string $query, $output = ARRAY_A ) {
+		// Indexed live lookup (F-C-3): WHERE token_hash = %s AND token_type = %s AND revoked_at IS NULL AND expires_at > %s
+		if ( preg_match( '/FROM\s+(\S+)\s+WHERE\s+token_hash\s*=\s*%s\s+AND\s+token_type\s*=\s*%s\s+AND\s+revoked_at\s+IS\s+NULL\s+AND\s+expires_at/i', $query, $m ) ) {
+			$table = $m[1];
+			$hash  = (string) ( $this->last_args[0] ?? '' );
+			$type  = (string) ( $this->last_args[1] ?? '' );
+			$now   = (string) ( $this->last_args[2] ?? gmdate( 'Y-m-d H:i:s' ) );
+			foreach ( $this->tables[ $table ] ?? array() as $row ) {
+				if ( ( $row['token_hash'] ?? '' ) !== $hash ) {
+					continue;
+				}
+				if ( ( $row['token_type'] ?? '' ) !== $type ) {
+					continue;
+				}
+				if ( null !== ( $row['revoked_at'] ?? null ) ) {
+					continue;
+				}
+				if ( ( $row['expires_at'] ?? '' ) <= $now ) {
+					continue;
+				}
+				return $row;
+			}
+			return null;
+		}
+		// Indexed revoked lookup
+		if ( preg_match( '/FROM\s+(\S+)\s+WHERE\s+token_hash\s*=\s*%s\s+AND\s+token_type\s*=\s*%s\s+AND\s+revoked_at\s+IS\s+NOT\s+NULL/i', $query, $m ) ) {
+			$table = $m[1];
+			$hash  = (string) ( $this->last_args[0] ?? '' );
+			$type  = (string) ( $this->last_args[1] ?? '' );
+			foreach ( $this->tables[ $table ] ?? array() as $row ) {
+				if ( ( $row['token_hash'] ?? '' ) !== $hash ) {
+					continue;
+				}
+				if ( ( $row['token_type'] ?? '' ) !== $type ) {
+					continue;
+				}
+				if ( null === ( $row['revoked_at'] ?? null ) ) {
+					continue;
+				}
+				return $row;
+			}
+			return null;
+		}
 		return null;
 	}
 
